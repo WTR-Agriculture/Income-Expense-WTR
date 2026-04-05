@@ -57,6 +57,7 @@ export default function App() {
   const [syncStatus, setSyncStatus] = useState('idle');
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [searchTerm, setSearchTerm] = useState('');
+  const [settingsTab, setSettingsTab] = useState('businesses'); // 'businesses' | 'parties'
 
   // File Upload State
   const [selectedImages, setSelectedImages] = useState([]);
@@ -973,59 +974,100 @@ export default function App() {
 
         {activeTab === 'settings' && (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
-              <h2 className="text-2xl md:text-3xl font-black tracking-tighter">จัดการธุรกิจ<br className="sm:hidden" /><span className="text-sm md:text-3xl opacity-40 sm:opacity-100 italic sm:not-italic"> (Businesses)</span></h2>
-              <button onClick={() => setIsAddBusinessModalOpen(true)} className="w-full sm:w-auto bg-[#1D1B20] text-[#DDFD54] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 border-2 border-[#1D1B20] shadow-lg"><Plus size={18} /> เพิ่มธุรกิจใหม่</button>
-            </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-              {businesses.map(b => (
-                <div key={b.id} className="bg-white p-8 rounded-[40px] shadow-md border-2 border-[#EAE3F4] relative group transition-all hover:border-[#1D1B20]">
-                  <div className="flex items-center gap-4 mb-6">
-                    <div className="w-14 h-14 bg-[#DDFD54] rounded-2xl flex items-center justify-center shadow-lg">{getIcon(b.icon)}</div>
-                    <h4 className="font-black text-2xl tracking-tighter">{b.name}</h4>
-                  </div>
-                  <div className="space-y-4">
-                    <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button onClick={() => { setEditingBusinessId(b.id); setIsEditCategoryModalOpen(true); }} className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
-                    <div className="flex flex-wrap gap-2">
-                      {categories[b.id]?.income.concat(categories[b.id]?.expense).slice(0, 4).map(c => <span key={c} className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black">{c}</span>)}
-                      <span className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black opacity-40">...</span>
+          {/* ——— Settings Tab Header + Sub-Tabs ——— */}
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+            <div>
+              <h2 className="text-2xl md:text-4xl font-black tracking-tighter">ตั้งค่าระบบ</h2>
+              <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mt-1">SYSTEM SETTINGS</p>
+            </div>
+            {/* Tab switcher */}
+            <div className="bg-white border-2 border-[#EAE3F4] p-1.5 rounded-full flex gap-1 shadow-sm w-full sm:w-auto">
+              <button
+                onClick={() => setSettingsTab('businesses')}
+                className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${
+                  settingsTab === 'businesses'
+                    ? 'bg-[#1D1B20] text-[#DDFD54] shadow-md'
+                    : 'text-[#7A7585] hover:text-[#1D1B20]'
+                }`}>
+                <Briefcase size={14} /> จัดการธุรกิจ
+              </button>
+              <button
+                onClick={() => setSettingsTab('parties')}
+                className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${
+                  settingsTab === 'parties'
+                    ? 'bg-[#AE88F9] text-white shadow-md'
+                    : 'text-[#7A7585] hover:text-[#1D1B20]'
+                }`}>
+                <Users size={14} /> จัดการคู่ค้า
+              </button>
+            </div>
+          </div>
+
+          {/* ——— Panel: Businesses ——— */}
+          {settingsTab === 'businesses' && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
+                <h3 className="text-xl md:text-2xl font-black tracking-tighter">จัดการธุรกิจ <span className="opacity-40 italic text-sm">(Businesses)</span></h3>
+                <button onClick={() => setIsAddBusinessModalOpen(true)} className="w-full sm:w-auto bg-[#1D1B20] text-[#DDFD54] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 border-2 border-[#1D1B20] shadow-lg"><Plus size={18} /> เพิ่มธุรกิจใหม่</button>
+              </div>
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {businesses.map(b => (
+                  <div key={b.id} className="bg-white p-8 rounded-[40px] shadow-md border-2 border-[#EAE3F4] relative group transition-all hover:border-[#1D1B20]">
+                    <div className="flex items-center gap-4 mb-6">
+                      <div className="w-14 h-14 bg-[#DDFD54] rounded-2xl flex items-center justify-center shadow-lg">{getIcon(b.icon)}</div>
+                      <h4 className="font-black text-2xl tracking-tighter">{b.name}</h4>
                     </div>
+                    <div className="space-y-4">
+                      <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button onClick={() => { setEditingBusinessId(b.id); setIsEditCategoryModalOpen(true); }} className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
+                      <div className="flex flex-wrap gap-2">
+                        {categories[b.id]?.income.concat(categories[b.id]?.expense).slice(0, 4).map(c => <span key={c} className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black">{c}</span>)}
+                        <span className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black opacity-40">...</span>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </div>
+          )}
+
+          {/* ——— Panel: Parties ——— */}
+          {settingsTab === 'parties' && (
+            <div className="space-y-6 animate-in fade-in duration-300">
+              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-[#AE88F9] p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm text-white">
+                <div className="flex items-center gap-4">
+                  <div className="bg-white/20 p-4 rounded-3xl"><Users size={28} /></div>
+                  <div>
+                    <h3 className="text-xl md:text-2xl font-black tracking-tighter leading-none">จัดการรายชื่อคู่ค้าประจำ</h3>
+                    <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">Master Data Management</p>
                   </div>
                 </div>
-              ))}
-            </div>
-
-            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-[#AE88F9] p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm text-white mt-12">
-              <div className="flex items-center gap-4">
-                <div className="bg-white/20 p-4 rounded-3xl"><Users size={32} /></div>
-                <h2 className="text-2xl md:text-3xl font-black tracking-tighter leading-none">จัดการรายชื่อคู่ค้าประจำ<br /><span className="text-xs opacity-60 font-black uppercase tracking-widest leading-none">Master Data Management</span></h2>
+                <button onClick={() => { setSelectedParty(null); setIsAddPartyModalOpen(true); }} className="w-full sm:w-auto bg-white text-[#AE88F9] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all">เพิ่มรายชื่อใหม่</button>
               </div>
-              <button onClick={() => { setSelectedParty(null); setIsAddPartyModalOpen(true); }} className="w-full sm:w-auto bg-white text-[#AE88F9] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all">เพิ่มรายชื่อใหม่</button>
-            </div>
-
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
-              {parties.map(p => {
-                const pHistory = transactions.filter(t => t.party === p.name);
-                const pIn = pHistory.filter(t => t.type === 'income').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
-                const pOut = pHistory.filter(t => t.type === 'expense').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
-                return (
-                  <div key={p.id} onClick={() => { setSelectedParty(p); setIsPartyHistoryOpen(true); }} className="bg-white p-6 rounded-[32px] border-2 border-[#EAE3F4] hover:border-[#AE88F9] transition-all cursor-pointer group shadow-sm">
-                    <div className="flex justify-between items-start mb-4">
-                      <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${p.type === 'customer' ? 'bg-emerald-50 text-emerald-500' : 'bg-[#AE88F9]/10 text-[#AE88F9]'}`}>{p.type === 'customer' ? 'ลูกค้า' : 'ร้านค้า'}</div>
-                      <button onClick={(e) => { e.stopPropagation(); if (confirm('ลบลูกค้านี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16} /></button>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                {parties.map(p => {
+                  const pHistory = transactions.filter(t => t.party === p.name);
+                  const pIn = pHistory.filter(t => t.type === 'income').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+                  const pOut = pHistory.filter(t => t.type === 'expense').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+                  return (
+                    <div key={p.id} onClick={() => { setSelectedParty(p); setIsPartyHistoryOpen(true); }} className="bg-white p-6 rounded-[32px] border-2 border-[#EAE3F4] hover:border-[#AE88F9] transition-all cursor-pointer group shadow-sm">
+                      <div className="flex justify-between items-start mb-4">
+                        <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${p.type === 'customer' ? 'bg-emerald-50 text-emerald-500' : 'bg-[#AE88F9]/10 text-[#AE88F9]'}`}>{p.type === 'customer' ? 'ลูกค้า' : 'ร้านค้า'}</div>
+                        <button onClick={(e) => { e.stopPropagation(); if (confirm('ลบลูกค้านี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16} /></button>
+                      </div>
+                      <h4 className="font-black text-xl mb-1 truncate leading-tight uppercase tracking-tight">{p.name}</h4>
+                      <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-4">Activity: {pHistory.length} รายการ</p>
+                      <div className="flex justify-between border-t border-[#F8F7FA] pt-4">
+                        <div><p className="text-[8px] font-black opacity-40 uppercase">Income</p><p className="text-emerald-500 font-black text-sm">+{pIn.toLocaleString()}</p></div>
+                        <div className="text-right"><p className="text-[8px] font-black opacity-40 uppercase">Expense</p><p className="text-[#AE88F9] font-black text-sm">-{pOut.toLocaleString()}</p></div>
+                      </div>
                     </div>
-                    <h4 className="font-black text-xl mb-1 truncate leading-tight uppercase tracking-tight">{p.name}</h4>
-                    <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-4">Activity: {pHistory.length} รายการ</p>
-                    <div className="flex justify-between border-t border-[#F8F7FA] pt-4">
-                      <div><p className="text-[8px] font-black opacity-40 uppercase">Income</p><p className="text-emerald-500 font-black text-sm">+{pIn.toLocaleString()}</p></div>
-                      <div className="text-right"><p className="text-[8px] font-black opacity-40 uppercase">Expense</p><p className="text-[#AE88F9] font-black text-sm">-{pOut.toLocaleString()}</p></div>
-                    </div>
-                  </div>
-                );
-              })}
-              {parties.length === 0 && <div className="col-span-full py-12 text-center opacity-30 font-black uppercase text-xs">ยังไม่มีข้อมูลรายชื่อคู่ค้าประจำ</div>}
+                  );
+                })}
+                {parties.length === 0 && <div className="col-span-full py-12 text-center opacity-30 font-black uppercase text-xs">ยังไม่มีข้อมูลรายชื่อคู่ค้าประจำ</div>}
+              </div>
             </div>
+          )}
           </div>
         )}
       </main>
