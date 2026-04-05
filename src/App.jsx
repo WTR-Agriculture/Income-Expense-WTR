@@ -1259,7 +1259,12 @@ export default function App() {
                   { label: 'รายการ', value: selectedDetailTx.desc },
                   { label: 'คู่ค้า', value: selectedDetailTx.party },
                   { label: 'วันที่', value: selectedDetailTx.date },
-                  { label: 'เวลา', value: selectedDetailTx.time },
+                  { 
+                    label: 'เวลา', 
+                    value: selectedDetailTx.time?.includes('T') || selectedDetailTx.time?.length > 10
+                      ? new Date(selectedDetailTx.time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) 
+                      : selectedDetailTx.time 
+                  },
                   { label: 'ธุรกิจ', value: selectedDetailTx.business.toUpperCase() },
                   { label: 'เลขที่อ้างอิง (Ref)', value: selectedDetailTx.refjob || '-' }
                 ].map((item, i) => (
@@ -1288,9 +1293,9 @@ export default function App() {
               )}
 
               {/* Action Buttons */}
-              <div className="grid grid-cols-2 gap-4 pt-10">
-                <button onClick={() => { setIsDetailModalOpen(false); handleEditClick(selectedDetailTx); }} className="p-6 bg-white border-2 border-[#1D1B20] text-[#1D1B20] rounded-[24px] font-black text-lg flex items-center justify-center gap-3 hover:bg-[#F8F7FA] transition-colors shadow-sm"><Pencil size={24} /> แก้ไขข้อมูล</button>
-                <button onClick={() => { setTxToDelete(selectedDetailTx); setIsDeleteModalOpen(true); }} className="p-6 bg-rose-50 text-rose-600 rounded-[24px] font-black text-lg flex items-center justify-center gap-3 hover:bg-rose-100 transition-colors shadow-sm"><Trash2 size={24} /> ลบรายการนี้</button>
+              <div className="grid grid-cols-2 gap-3 pt-6">
+                <button onClick={() => { setIsDetailModalOpen(false); setTimeout(() => handleEditClick(selectedDetailTx), 100); }} className="py-3.5 bg-white border-2 border-[#1D1B20] text-[#1D1B20] rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#F8F7FA] transition-all shadow-sm active:scale-95"><Pencil size={18} /> แก้ไขข้อมูล</button>
+                <button onClick={() => { setTxToDelete(selectedDetailTx); setIsDeleteModalOpen(true); }} className="py-3.5 bg-rose-50 text-rose-600 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-rose-100 transition-all shadow-sm active:scale-95"><Trash2 size={18} /> ลบรายการนี้</button>
               </div>
             </div>
           </div>
