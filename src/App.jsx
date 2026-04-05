@@ -128,7 +128,7 @@ export default function App() {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
-    
+
     // PWA Install Prompt Listener
     const handleBeforeInstallPrompt = (e) => {
       e.preventDefault();
@@ -441,7 +441,7 @@ export default function App() {
       date: formData.date,
       party: formData.partyName || 'ทั่วไป',
       method: formData.paymentMethod,
-      time: isEditMode 
+      time: isEditMode
         ? transactions.find(t => t.id === editingTxId)?.time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       business: formData.business,
@@ -464,7 +464,7 @@ export default function App() {
     } else {
       setTransactions(prev => [...newTransactions, ...prev]);
     }
-    
+
     setIsModalOpen(false);
     const imagesToUpload = [...selectedImages];
     const editingId = editingTxId;
@@ -476,19 +476,19 @@ export default function App() {
     const saveToSheets = async () => {
       try {
         if (isEditing) {
-          await fetch(API_URL, { 
-            method: 'POST', 
-            body: JSON.stringify({ action: 'updateTransaction', payload: newTransactions[0] }), 
-            redirect: 'follow' 
+          await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'updateTransaction', payload: newTransactions[0] }),
+            redirect: 'follow'
           });
         } else {
-          await fetch(API_URL, { 
-            method: 'POST', 
-            body: JSON.stringify({ action: 'addTransactionsBatch', payload: newTransactions }), 
-            redirect: 'follow' 
+          await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'addTransactionsBatch', payload: newTransactions }),
+            redirect: 'follow'
           });
         }
-        
+
         // 3. Handle Cloudinary Images if any
         if (imagesToUpload.length > 0) {
           const CLOUDINARY_CLOUD = 'djrwxouxx';
@@ -500,7 +500,7 @@ export default function App() {
             fd.append('file', img.base64);
             fd.append('upload_preset', CLOUDINARY_PRESET);
             fd.append('folder', 'wtr_receipts');
-            
+
             const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: fd });
             const data = await res.json();
             if (data.secure_url) uploadedUrls.push(data.secure_url);
@@ -509,18 +509,18 @@ export default function App() {
           if (uploadedUrls.length > 0) {
             const finalUrl = uploadedUrls.join(', ');
             const targetIds = isEditing ? [editingId] : newTransactions.map(t => t.id);
-            
+
             // Update local state with URLs
-            setTransactions(prev => prev.map(t => 
+            setTransactions(prev => prev.map(t =>
               targetIds.includes(t.id) ? { ...t, receiptUrl: finalUrl } : t
             ));
-            
+
             // Update Sheets with URLs
             await fetch(API_URL, {
               method: 'POST',
-              body: JSON.stringify({ 
-                action: 'updateTransactionsBatchReceiptUrl', 
-                payload: { ids: targetIds, url: finalUrl } 
+              body: JSON.stringify({
+                action: 'updateTransactionsBatchReceiptUrl',
+                payload: { ids: targetIds, url: finalUrl }
               }),
               redirect: 'follow'
             });
@@ -715,7 +715,7 @@ export default function App() {
                 <p className="text-[10px] md:text-xs font-black text-[#7A7585] opacity-60 truncate uppercase tracking-widest">บันทึกรายรับ รายจ่าย เครือ WTR</p>
               </div>
             </div>
-            <button 
+            <button
               onClick={handleInstallClick}
               className="bg-[#DDFD54] text-[#1D1B20] px-6 md:px-10 py-3 md:py-4 rounded-2xl md:rounded-[24px] font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all whitespace-nowrap">
               ADD
@@ -727,7 +727,7 @@ export default function App() {
 
       {/* Business Switcher Tab */}
       <div className="max-w-7xl mx-auto w-full px-4 md:px-8 mt-4 overflow-x-auto no-scrollbar flex gap-2 pb-2">
-        <button onClick={() => setActiveBusinessId('all')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === 'all' ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>เครือ WTR</button>
+        <button onClick={() => setActiveBusinessId('all')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === 'all' ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>ธุรกิจ WTR</button>
         {businesses.map(b => (
           <button key={b.id} onClick={() => setActiveBusinessId(b.id)} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === b.id ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>{getIcon(b.icon)} {b.name}</button>
         ))}
@@ -787,9 +787,9 @@ export default function App() {
                       </div>
                     </div>
                     <div className="flex items-center gap-2">
-                       <p className={`font-black text-xs md:text-base tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{formatCurrency(tx.amount)}</p>
-                       {tx.receiptUrl && <ImageIcon size={14} className="text-[#AE88F9]/40" />}
-                       <ChevronRight size={14} className="text-[#AE88F9]/20 group-hover:translate-x-1 transition-transform" />
+                      <p className={`font-black text-xs md:text-base tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{formatCurrency(tx.amount)}</p>
+                      {tx.receiptUrl && <ImageIcon size={14} className="text-[#AE88F9]/40" />}
+                      <ChevronRight size={14} className="text-[#AE88F9]/20 group-hover:translate-x-1 transition-transform" />
                     </div>
                   </div>
                 ))}
@@ -962,7 +962,7 @@ export default function App() {
                   {currentPeriodTransactions.filter(tx => {
                     if (!searchTerm.trim()) return true;
                     const s = searchTerm.toLowerCase().trim();
-                    return (tx.desc||'').toLowerCase().includes(s) || (tx.party||'').toLowerCase().includes(s) || (tx.category||'').toLowerCase().includes(s);
+                    return (tx.desc || '').toLowerCase().includes(s) || (tx.party || '').toLowerCase().includes(s) || (tx.category || '').toLowerCase().includes(s);
                   }).slice(0, 50).map(tx => (
                     <div key={tx.id} onClick={() => { setSelectedDetailTx(tx); setIsDetailModalOpen(true); }} className="flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] hover:bg-[#F2EFF5] transition-all group cursor-pointer active:scale-[0.98]">
                       <div className="flex items-center gap-4 min-w-0 flex-1">
@@ -988,99 +988,97 @@ export default function App() {
         {activeTab === 'settings' && (
           <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
 
-          {/* ——— Settings Tab Header + Sub-Tabs ——— */}
-          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-            <div>
-              <h2 className="text-2xl md:text-4xl font-black tracking-tighter">ตั้งค่าระบบ</h2>
-              <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mt-1">SYSTEM SETTINGS</p>
-            </div>
-            {/* Tab switcher */}
-            <div className="bg-white border-2 border-[#EAE3F4] p-1.5 rounded-full flex gap-1 shadow-sm w-full sm:w-auto">
-              <button
-                onClick={() => setSettingsTab('businesses')}
-                className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${
-                  settingsTab === 'businesses'
-                    ? 'bg-[#1D1B20] text-[#DDFD54] shadow-md'
-                    : 'text-[#7A7585] hover:text-[#1D1B20]'
-                }`}>
-                <Briefcase size={14} /> จัดการธุรกิจ
-              </button>
-              <button
-                onClick={() => setSettingsTab('parties')}
-                className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${
-                  settingsTab === 'parties'
-                    ? 'bg-[#AE88F9] text-white shadow-md'
-                    : 'text-[#7A7585] hover:text-[#1D1B20]'
-                }`}>
-                <Users size={14} /> จัดการคู่ค้า
-              </button>
-            </div>
-          </div>
-
-          {/* ——— Panel: Businesses ——— */}
-          {settingsTab === 'businesses' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
-                <h3 className="text-xl md:text-2xl font-black tracking-tighter">จัดการธุรกิจ <span className="opacity-40 italic text-sm">(Businesses)</span></h3>
-                <button onClick={() => setIsAddBusinessModalOpen(true)} className="w-full sm:w-auto bg-[#1D1B20] text-[#DDFD54] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 border-2 border-[#1D1B20] shadow-lg"><Plus size={18} /> เพิ่มธุรกิจใหม่</button>
+            {/* ——— Settings Tab Header + Sub-Tabs ——— */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div>
+                <h2 className="text-2xl md:text-4xl font-black tracking-tighter">ตั้งค่าระบบ</h2>
+                <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mt-1">SYSTEM SETTINGS</p>
               </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {businesses.map(b => (
-                  <div key={b.id} className="bg-white p-8 rounded-[40px] shadow-md border-2 border-[#EAE3F4] relative group transition-all hover:border-[#1D1B20]">
-                    <div className="flex items-center gap-4 mb-6">
-                      <div className="w-14 h-14 bg-[#DDFD54] rounded-2xl flex items-center justify-center shadow-lg">{getIcon(b.icon)}</div>
-                      <h4 className="font-black text-2xl tracking-tighter">{b.name}</h4>
-                    </div>
-                    <div className="space-y-4">
-                      <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button onClick={() => { setEditingBusinessId(b.id); setIsEditCategoryModalOpen(true); }} className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
-                      <div className="flex flex-wrap gap-2">
-                        {categories[b.id]?.income.concat(categories[b.id]?.expense).slice(0, 4).map(c => <span key={c} className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black">{c}</span>)}
-                        <span className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black opacity-40">...</span>
-                      </div>
-                    </div>
-                  </div>
-                ))}
+              {/* Tab switcher */}
+              <div className="bg-white border-2 border-[#EAE3F4] p-1.5 rounded-full flex gap-1 shadow-sm w-full sm:w-auto">
+                <button
+                  onClick={() => setSettingsTab('businesses')}
+                  className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${settingsTab === 'businesses'
+                      ? 'bg-[#1D1B20] text-[#DDFD54] shadow-md'
+                      : 'text-[#7A7585] hover:text-[#1D1B20]'
+                    }`}>
+                  <Briefcase size={14} /> จัดการธุรกิจ
+                </button>
+                <button
+                  onClick={() => setSettingsTab('parties')}
+                  className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${settingsTab === 'parties'
+                      ? 'bg-[#AE88F9] text-white shadow-md'
+                      : 'text-[#7A7585] hover:text-[#1D1B20]'
+                    }`}>
+                  <Users size={14} /> จัดการคู่ค้า
+                </button>
               </div>
             </div>
-          )}
 
-          {/* ——— Panel: Parties ——— */}
-          {settingsTab === 'parties' && (
-            <div className="space-y-6 animate-in fade-in duration-300">
-              <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-[#AE88F9] p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm text-white">
-                <div className="flex items-center gap-4">
-                  <div className="bg-white/20 p-4 rounded-3xl"><Users size={28} /></div>
-                  <div>
-                    <h3 className="text-xl md:text-2xl font-black tracking-tighter leading-none">จัดการรายชื่อคู่ค้าประจำ</h3>
-                    <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">Master Data Management</p>
-                  </div>
+            {/* ——— Panel: Businesses ——— */}
+            {settingsTab === 'businesses' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
+                  <h3 className="text-xl md:text-2xl font-black tracking-tighter">จัดการธุรกิจ <span className="opacity-40 italic text-sm">(Businesses)</span></h3>
+                  <button onClick={() => setIsAddBusinessModalOpen(true)} className="w-full sm:w-auto bg-[#1D1B20] text-[#DDFD54] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 border-2 border-[#1D1B20] shadow-lg"><Plus size={18} /> เพิ่มธุรกิจใหม่</button>
                 </div>
-                <button onClick={() => { setSelectedParty(null); setIsAddPartyModalOpen(true); }} className="w-full sm:w-auto bg-white text-[#AE88F9] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all">เพิ่มรายชื่อใหม่</button>
-              </div>
-              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                {parties.map(p => {
-                  const pHistory = transactions.filter(t => t.party === p.name);
-                  const pIn = pHistory.filter(t => t.type === 'income').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
-                  const pOut = pHistory.filter(t => t.type === 'expense').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
-                  return (
-                    <div key={p.id} onClick={() => { setSelectedParty(p); setIsPartyHistoryOpen(true); }} className="bg-white p-6 rounded-[32px] border-2 border-[#EAE3F4] hover:border-[#AE88F9] transition-all cursor-pointer group shadow-sm">
-                      <div className="flex justify-between items-start mb-4">
-                        <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${p.type === 'customer' ? 'bg-emerald-50 text-emerald-500' : 'bg-[#AE88F9]/10 text-[#AE88F9]'}`}>{p.type === 'customer' ? 'ลูกค้า' : 'ร้านค้า'}</div>
-                        <button onClick={(e) => { e.stopPropagation(); if (confirm('ลบลูกค้านี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16} /></button>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                  {businesses.map(b => (
+                    <div key={b.id} className="bg-white p-8 rounded-[40px] shadow-md border-2 border-[#EAE3F4] relative group transition-all hover:border-[#1D1B20]">
+                      <div className="flex items-center gap-4 mb-6">
+                        <div className="w-14 h-14 bg-[#DDFD54] rounded-2xl flex items-center justify-center shadow-lg">{getIcon(b.icon)}</div>
+                        <h4 className="font-black text-2xl tracking-tighter">{b.name}</h4>
                       </div>
-                      <h4 className="font-black text-xl mb-1 truncate leading-tight uppercase tracking-tight">{p.name}</h4>
-                      <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-4">Activity: {pHistory.length} รายการ</p>
-                      <div className="flex justify-between border-t border-[#F8F7FA] pt-4">
-                        <div><p className="text-[8px] font-black opacity-40 uppercase">Income</p><p className="text-emerald-500 font-black text-sm">+{pIn.toLocaleString()}</p></div>
-                        <div className="text-right"><p className="text-[8px] font-black opacity-40 uppercase">Expense</p><p className="text-[#AE88F9] font-black text-sm">-{pOut.toLocaleString()}</p></div>
+                      <div className="space-y-4">
+                        <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button onClick={() => { setEditingBusinessId(b.id); setIsEditCategoryModalOpen(true); }} className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
+                        <div className="flex flex-wrap gap-2">
+                          {categories[b.id]?.income.concat(categories[b.id]?.expense).slice(0, 4).map(c => <span key={c} className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black">{c}</span>)}
+                          <span className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black opacity-40">...</span>
+                        </div>
                       </div>
                     </div>
-                  );
-                })}
-                {parties.length === 0 && <div className="col-span-full py-12 text-center opacity-30 font-black uppercase text-xs">ยังไม่มีข้อมูลรายชื่อคู่ค้าประจำ</div>}
+                  ))}
+                </div>
               </div>
-            </div>
-          )}
+            )}
+
+            {/* ——— Panel: Parties ——— */}
+            {settingsTab === 'parties' && (
+              <div className="space-y-6 animate-in fade-in duration-300">
+                <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-[#AE88F9] p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm text-white">
+                  <div className="flex items-center gap-4">
+                    <div className="bg-white/20 p-4 rounded-3xl"><Users size={28} /></div>
+                    <div>
+                      <h3 className="text-xl md:text-2xl font-black tracking-tighter leading-none">จัดการรายชื่อคู่ค้าประจำ</h3>
+                      <p className="text-[10px] opacity-60 font-black uppercase tracking-widest">Master Data Management</p>
+                    </div>
+                  </div>
+                  <button onClick={() => { setSelectedParty(null); setIsAddPartyModalOpen(true); }} className="w-full sm:w-auto bg-white text-[#AE88F9] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all">เพิ่มรายชื่อใหม่</button>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                  {parties.map(p => {
+                    const pHistory = transactions.filter(t => t.party === p.name);
+                    const pIn = pHistory.filter(t => t.type === 'income').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+                    const pOut = pHistory.filter(t => t.type === 'expense').reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
+                    return (
+                      <div key={p.id} onClick={() => { setSelectedParty(p); setIsPartyHistoryOpen(true); }} className="bg-white p-6 rounded-[32px] border-2 border-[#EAE3F4] hover:border-[#AE88F9] transition-all cursor-pointer group shadow-sm">
+                        <div className="flex justify-between items-start mb-4">
+                          <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${p.type === 'customer' ? 'bg-emerald-50 text-emerald-500' : 'bg-[#AE88F9]/10 text-[#AE88F9]'}`}>{p.type === 'customer' ? 'ลูกค้า' : 'ร้านค้า'}</div>
+                          <button onClick={(e) => { e.stopPropagation(); if (confirm('ลบลูกค้านี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16} /></button>
+                        </div>
+                        <h4 className="font-black text-xl mb-1 truncate leading-tight uppercase tracking-tight">{p.name}</h4>
+                        <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-4">Activity: {pHistory.length} รายการ</p>
+                        <div className="flex justify-between border-t border-[#F8F7FA] pt-4">
+                          <div><p className="text-[8px] font-black opacity-40 uppercase">Income</p><p className="text-emerald-500 font-black text-sm">+{pIn.toLocaleString()}</p></div>
+                          <div className="text-right"><p className="text-[8px] font-black opacity-40 uppercase">Expense</p><p className="text-[#AE88F9] font-black text-sm">-{pOut.toLocaleString()}</p></div>
+                        </div>
+                      </div>
+                    );
+                  })}
+                  {parties.length === 0 && <div className="col-span-full py-12 text-center opacity-30 font-black uppercase text-xs">ยังไม่มีข้อมูลรายชื่อคู่ค้าประจำ</div>}
+                </div>
+              </div>
+            )}
           </div>
         )}
       </main>
@@ -1170,9 +1168,8 @@ export default function App() {
                     placeholder="พิมพ์ชื่อที่นี่..."
                     value={newPartyInput.name}
                     onChange={e => setNewPartyInput(prev => ({ ...prev, name: e.target.value }))}
-                    className={`w-full bg-[#F8F7FA] p-6 rounded-3xl outline-none font-black text-lg border-2 transition ${
-                      isDupName ? 'border-red-400 bg-red-50' : 'border-transparent focus:border-[#AE88F9]'
-                    }`}
+                    className={`w-full bg-[#F8F7FA] p-6 rounded-3xl outline-none font-black text-lg border-2 transition ${isDupName ? 'border-red-400 bg-red-50' : 'border-transparent focus:border-[#AE88F9]'
+                      }`}
                   />
                   {isDupName && (
                     <p className="text-red-500 text-xs font-black ml-2 animate-pulse">
@@ -1186,21 +1183,19 @@ export default function App() {
                     <button
                       disabled={isDupName || !newPartyInput.name.trim()}
                       onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'customer' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
-                      className={`py-5 rounded-3xl font-black text-sm transition ${
-                        isDupName || !newPartyInput.name.trim()
+                      className={`py-5 rounded-3xl font-black text-sm transition ${isDupName || !newPartyInput.name.trim()
                           ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                           : 'bg-emerald-50 text-emerald-600 hover:scale-[1.02] shadow-sm'
-                      }`}>
+                        }`}>
                       ลูกค้า
                     </button>
                     <button
                       disabled={isDupName || !newPartyInput.name.trim()}
                       onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'supplier' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
-                      className={`py-5 rounded-3xl font-black text-sm transition ${
-                        isDupName || !newPartyInput.name.trim()
+                      className={`py-5 rounded-3xl font-black text-sm transition ${isDupName || !newPartyInput.name.trim()
                           ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                           : 'bg-[#AE88F9]/10 text-[#AE88F9] hover:scale-[1.02] shadow-sm'
-                      }`}>
+                        }`}>
                       ร้านค้า
                     </button>
                   </div>
@@ -1310,68 +1305,68 @@ export default function App() {
                     <span className="text-[10px] font-black uppercase tracking-widest">เพิ่มรายการย่อย</span>
                   </button>
                 </div>
-                
+
                 <div className="space-y-3">
                   {formData.items.map((item, index) => (
                     <div key={item.id} className="bg-[#F8F7FA] p-4 md:p-6 rounded-[28px] border-2 border-transparent hover:border-[#EAE3F4] transition-all animate-in slide-in-from-left duration-300">
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
                         <div className="relative">
-                          <input 
-                            type="text" 
-                            placeholder="ชื่อรายการ..." 
-                            value={item.itemName} 
+                          <input
+                            type="text"
+                            placeholder="ชื่อรายการ..."
+                            value={item.itemName}
                             onChange={e => {
                               const newItems = [...formData.items];
                               newItems[index].itemName = e.target.value;
                               setFormData({ ...formData, items: newItems });
-                            }} 
-                            className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm focus:ring-2 focus:ring-[#AE88F9]/20" 
+                            }}
+                            className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm focus:ring-2 focus:ring-[#AE88F9]/20"
                           />
                         </div>
-                        <select 
-                          value={item.category} 
+                        <select
+                          value={item.category}
                           onChange={e => {
                             const newItems = [...formData.items];
                             newItems[index].category = e.target.value;
                             setFormData({ ...formData, items: newItems });
-                          }} 
+                          }}
                           className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm appearance-none border-none">
                           {(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}
                         </select>
                       </div>
-                      
+
                       <div className="flex items-center gap-3">
                         <div className="flex-1 flex gap-2">
                           <div className="flex-1">
                             <label className="text-[8px] font-black uppercase opacity-30 ml-2 mb-1 block">ราคา</label>
-                            <input 
-                              type="number" 
-                              placeholder="ราคา" 
-                              value={item.unitPrice} 
+                            <input
+                              type="number"
+                              placeholder="ราคา"
+                              value={item.unitPrice}
                               onChange={e => {
                                 const newItems = [...formData.items];
                                 newItems[index].unitPrice = e.target.value;
                                 setFormData({ ...formData, items: newItems });
-                              }} 
-                              className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm" 
+                              }}
+                              className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm"
                             />
                           </div>
                           <div className="w-20">
                             <label className="text-[8px] font-black uppercase opacity-30 ml-2 mb-1 block">จำนวน</label>
-                            <input 
-                              type="number" 
-                              placeholder="จำนวน" 
-                              value={item.quantity} 
+                            <input
+                              type="number"
+                              placeholder="จำนวน"
+                              value={item.quantity}
                               onChange={e => {
                                 const newItems = [...formData.items];
                                 newItems[index].quantity = e.target.value;
                                 setFormData({ ...formData, items: newItems });
-                              }} 
-                              className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm text-center" 
+                              }}
+                              className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm text-center"
                             />
                           </div>
                         </div>
-                        
+
                         {formData.items.length > 1 && (
                           <div className="pt-5">
                             <button type="button" onClick={() => setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) })} className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-all">
@@ -1444,15 +1439,15 @@ export default function App() {
           </div>
           <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-3">
             <div className="max-w-4xl mx-auto space-y-3">
-                {filteredTransactions.map(tx => (
-                  <div key={tx.id} onClick={() => { setSelectedDetailTx(tx); setIsDetailModalOpen(true); }} className="flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[32px] shadow-sm cursor-pointer active:scale-[0.98] hover:border-[#1D1B20] transition-all">
-                    <div className="flex items-center gap-4 md:gap-6 min-w-0">
-                      <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-black shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />)}</div>
-                      <div className="truncate"><h4 className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</h4><p className="text-[10px] uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.business} • {tx.party}</p></div>
-                    </div>
-                    <div className="text-right ml-4"><p className={`text-sm md:text-2xl font-black tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}</p></div>
+              {filteredTransactions.map(tx => (
+                <div key={tx.id} onClick={() => { setSelectedDetailTx(tx); setIsDetailModalOpen(true); }} className="flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[32px] shadow-sm cursor-pointer active:scale-[0.98] hover:border-[#1D1B20] transition-all">
+                  <div className="flex items-center gap-4 md:gap-6 min-w-0">
+                    <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-black shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={20} /> : <ArrowDownRight size={20} />)}</div>
+                    <div className="truncate"><h4 className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</h4><p className="text-[10px] uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.business} • {tx.party}</p></div>
                   </div>
-                ))}
+                  <div className="text-right ml-4"><p className={`text-sm md:text-2xl font-black tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}</p></div>
+                </div>
+              ))}
             </div>
           </div>
         </div>
@@ -1576,11 +1571,11 @@ export default function App() {
                   { label: 'รายการ', value: selectedDetailTx.desc },
                   { label: 'คู่ค้า', value: selectedDetailTx.party },
                   { label: 'วันที่', value: selectedDetailTx.date },
-                  { 
-                    label: 'เวลา', 
+                  {
+                    label: 'เวลา',
                     value: selectedDetailTx.time?.includes('T') || selectedDetailTx.time?.length > 10
-                      ? new Date(selectedDetailTx.time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) 
-                      : selectedDetailTx.time 
+                      ? new Date(selectedDetailTx.time).toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+                      : selectedDetailTx.time
                   },
                   { label: 'ธุรกิจ', value: selectedDetailTx.business.toUpperCase() },
                   { label: 'เลขที่อ้างอิง (Ref)', value: selectedDetailTx.refjob || '-' }
@@ -1623,24 +1618,24 @@ export default function App() {
         <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[2000] w-[calc(100%-2rem)] max-w-sm animate-in slide-in-from-bottom-10 duration-700">
           <div className="bg-[#1D1B20] border-2 border-[#DDFD54]/30 p-6 rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl relative overflow-hidden group">
             <div className="absolute inset-0 bg-gradient-to-br from-[#AE88F9]/15 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
-            
+
             <div className="relative flex flex-col items-center gap-5 text-center">
               <div className="w-16 h-16 bg-[#DDFD54]/10 rounded-full flex items-center justify-center animate-pulse">
                 <RefreshCcw size={32} className="text-[#DDFD54]" />
               </div>
-              
+
               <div>
                 <h4 className="text-white font-black text-xl tracking-tighter uppercase leading-none mb-2">New Version Ready</h4>
                 <p className="text-[#7A7585] text-xs font-black uppercase tracking-widest leading-relaxed">พบเวอร์ชันล่าสุดจาก [WTR HQ]<br />อัปเดตเพื่อรับฟีเจอร์ใหม่ทันทีค่ะ</p>
               </div>
 
               <div className="flex gap-3 w-full mt-2">
-                <button 
+                <button
                   onClick={() => updateServiceWorker(true)}
                   className="flex-1 bg-[#DDFD54] text-[#1D1B20] py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all hover:bg-[#DDFD54]/90">
                   UPDATE NOW
                 </button>
-                <button 
+                <button
                   onClick={closeUpdatePrompt}
                   className="px-6 bg-white/5 text-white/50 border border-white/10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all">
                   SKIP
