@@ -1015,6 +1015,38 @@ export default function App() {
               </div>
             </div>
 
+            {/* --- System Management & Updates --- */}
+            <div className="bg-[#1D1B20] p-8 md:p-10 rounded-[48px] shadow-2xl text-white relative overflow-hidden group border-2 border-transparent hover:border-[#DDFD54]/20 transition-all">
+              <div className="absolute top-0 right-0 p-8 opacity-10 group-hover:opacity-20 transition-opacity"><Shield size={80} /></div>
+              <div className="relative z-10">
+                <div className="flex items-center gap-3 mb-6">
+                  <div className="w-10 h-10 bg-[#DDFD54]/10 rounded-2xl flex items-center justify-center"><RefreshCcw size={20} className="text-[#DDFD54]" /></div>
+                  <h3 className="text-xl font-black tracking-tighter uppercase leading-none">การจัดการระบบ & ความปลอดภัย</h3>
+                </div>
+                
+                <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
+                  <div>
+                    <h4 className="font-black text-lg text-[#DDFD54] mb-1">เวอร์ชันปัจจุบัน: WTR Ledger v3.2</h4>
+                    <p className="text-xs font-black text-white/40 uppercase tracking-widest leading-relaxed">
+                      {needRefresh ? 'ตรวจพบเวอร์ชันใหม่ที่เสถียรกว่า!' : 'คุณกำลังใช้งานเวอร์ชันล่าสุดที่เสถียรที่สุดค่ะ'}
+                    </p>
+                  </div>
+                  
+                  {needRefresh ? (
+                    <button 
+                      onClick={() => updateServiceWorker(true)}
+                      className="w-full md:w-auto bg-[#DDFD54] text-[#1D1B20] px-8 py-4 rounded-[24px] font-black text-sm shadow-[0_10px_30px_rgba(221,253,84,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">
+                      <Sparkles size={18} /> อัปเดตเข้าระบบล่าสุด
+                    </button>
+                  ) : (
+                    <div className="w-full md:w-auto bg-white/5 border border-white/10 px-8 py-4 rounded-[24px] font-black text-sm text-white/30 flex items-center justify-center gap-3 pointer-events-none">
+                      <Check size={18} className="text-emerald-500" /> ระบบล่าสุดแล้ว
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
             {/* ——— Panel: Businesses ——— */}
             {settingsTab === 'businesses' && (
               <div className="space-y-6 animate-in fade-in duration-300">
