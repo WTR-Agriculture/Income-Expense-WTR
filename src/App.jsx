@@ -709,7 +709,7 @@ export default function App() {
       <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
 
       {/* Navbar */}
-      <nav className="px-3 md:px-8 py-3 md:py-5 w-full sticky top-0 z-50 bg-[#F8F7FA]/90 backdrop-blur-md">
+      <nav className="px-3 md:px-8 pt-[calc(0.75rem+env(safe-area-inset-top))] pb-3 md:pt-[calc(1.25rem+env(safe-area-inset-top))] md:pb-5 w-full sticky top-0 z-50 bg-[#F8F7FA]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto bg-white rounded-full px-4 md:px-6 py-2.5 md:py-3 flex justify-between items-center shadow-lg border border-[#EAE3F4]/50 z-50">
           <div className="flex items-center gap-3">
             <button className="lg:hidden p-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}><Menu size={20} /></button>
@@ -730,7 +730,7 @@ export default function App() {
       {/* Mobile Menu Dropdown */}
       {isMobileMenuOpen && (
         <div className="lg:hidden fixed inset-0 z-[60] bg-[#1D1B20]/40 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="absolute top-[90px] left-4 right-4 bg-white rounded-[32px] p-4 shadow-2xl border border-[#EAE3F4] flex flex-col gap-2 animate-in slide-in-from-top-8 duration-300" onClick={e => e.stopPropagation()}>
+          <div className="absolute top-[calc(80px+env(safe-area-inset-top))] left-4 right-4 bg-white rounded-[32px] p-4 shadow-2xl border border-[#EAE3F4] flex flex-col gap-2 animate-in slide-in-from-top-8 duration-300" onClick={e => e.stopPropagation()}>
             {[
               { id: 'dashboard', label: 'หน้าแรก / ภาพรวม', icon: Home },
               { id: 'reports', label: 'รายงานรายรับ-จ่าย', icon: PieChart },
