@@ -304,6 +304,21 @@ export default function App() {
     }
   };
 
+  const handleExportCSV = () => {
+    if (currentPeriodTransactions.length === 0) return alert('ไม่มีข้อมูลสำหรับส่งออก');
+    const headers = ['Date', 'Type', 'Description', 'Category', 'Party', 'Amount', 'Method', 'Business'];
+    const rows = currentPeriodTransactions.map(t => [
+      t.date, t.type === 'income' ? 'รายรับ' : 'รายจ่าย', t.desc, t.category, t.party, t.amount, t.method === 'cash' ? 'เงินสด' : 'เงินโอน', t.business
+    ]);
+    const csvContent = "\uFEFF" + [headers.join(','), ...rows.map(r => r.join(','))].join('\n');
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.setAttribute('href', url);
+    link.setAttribute('download', `WTR_Ledger_Export_${reportPeriod}_${new Date().toISOString().split('T')[0]}.csv`);
+    link.click();
+  };
+
   const formatCurrency = (val) => `฿${(parseFloat(val) || 0).toLocaleString()}`;
   const getIcon = (name) => { const Icon = ICON_MAP[name] || Briefcase; return <Icon size={18} />; };
 
@@ -430,7 +445,7 @@ export default function App() {
                     <ChevronDown size={14} />
                   </button>
 
-                  <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#DDFD54] px-6 py-2.5 rounded-full font-black text-[#1D1B20] text-xs shadow-md"><Download size={16} /> Export</button>
+                  <button onClick={handleExportCSV} className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#DDFD54] px-6 py-2.5 rounded-full font-black text-[#1D1B20] text-xs shadow-md active:scale-95 transition-transform"><Download size={16} /> Export</button>
                </div>
              </div>
 
@@ -537,10 +552,10 @@ export default function App() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
-             <div className="flex justify-between items-center bg-white p-8 rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
-                <h2 className="text-3xl font-black tracking-tighter">จัดการธุรกิจ (Businesses)</h2>
-                <button onClick={() => setIsAddBusinessModalOpen(true)} className="bg-[#1D1B20] text-[#DDFD54] px-6 py-3 rounded-2xl font-black text-sm transition-transform active:scale-95 flex items-center gap-2"><Plus size={18}/> เพิ่มธุรกิจใหม่</button>
+          <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
+             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-white p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
+                <h2 className="text-2xl md:text-3xl font-black tracking-tighter">จัดการธุรกิจ<br className="sm:hidden"/><span className="text-sm md:text-3xl opacity-40 sm:opacity-100 italic sm:not-italic"> (Businesses)</span></h2>
+                <button onClick={() => setIsAddBusinessModalOpen(true)} className="w-full sm:w-auto bg-[#1D1B20] text-[#DDFD54] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm transition-transform active:scale-95 flex items-center justify-center gap-2 whitespace-nowrap shrink-0 border-2 border-[#1D1B20] shadow-lg"><Plus size={18}/> เพิ่มธุรกิจใหม่</button>
              </div>
 
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
