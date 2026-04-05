@@ -138,7 +138,25 @@ export default function App() {
 
   const breakdownData = useMemo(() => {
     const calc = (type) => {
-      const filtered = transactions.filter(t => t.type === type);
+      const now = new Date();
+      const filtered = transactions.filter(t => {
+        if (t.type !== type) return false;
+        if (!t.date) return true;
+        const tDate = new Date(t.date);
+        
+        if (reportPeriod === 'daily') {
+          return tDate.toDateString() === now.toDateString();
+        } else if (reportPeriod === 'weekly') {
+          const diff = now.getTime() - tDate.getTime();
+          return diff <= 7 * 24 * 60 * 60 * 1000;
+        } else if (reportPeriod === 'monthly') {
+          return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+        } else if (reportPeriod === 'yearly') {
+          return tDate.getFullYear() === now.getFullYear();
+        }
+        return true;
+      });
+
       const total = filtered.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
       const categoryMap = {};
       filtered.forEach(t => {
@@ -152,7 +170,7 @@ export default function App() {
       return { total, items };
     };
     return { income: calc('income'), expense: calc('expense') };
-  }, [transactions]);
+  }, [transactions, reportPeriod]);
 
   // Form Handlers
   const [formData, setFormData] = useState({
@@ -418,7 +436,8 @@ export default function App() {
                  {[
                    {id: 'daily', label: 'รายวัน'},
                    {id: 'weekly', label: 'สัปดาห์'},
-                   {id: 'monthly', label: 'เดือน'}
+                   {id: 'monthly', label: 'เดือน'},
+                   {id: 'yearly', label: 'รายปี'}
                  ].map(p => (
                    <button key={p.id} onClick={() => setReportPeriod(p.id)} className={`px-3 md:px-5 py-1.5 md:py-2 font-black text-[10px] md:text-xs rounded-full transition-all ${reportPeriod === p.id ? 'bg-[#1D1B20] text-[#DDFD54]' : 'text-[#7A7585]'}`}>
                      {p.label}
