@@ -14,13 +14,24 @@ function doGet(e) {
 }
 
 function doPost(e) {
+  // ★ รับ uploadFile แบบใหม่: action ใน URL params, base64 เป็น body ตรงๆ
+  if (e.parameter && e.parameter.action === 'uploadFile') {
+    return uploadSingleFile(
+      e.parameter.txId,
+      e.parameter.fileName,
+      e.parameter.fileType || 'image/jpeg',
+      e.postData.contents  // raw base64 string (ไม่มี data:...;base64, prefix)
+    );
+  }
+
+  // JSON actions (addTransaction, updateTransaction, ...)
   let data;
   try {
     data = JSON.parse(e.postData.contents);
   } catch (err) {
-    return createResponse({ status: 'error', message: 'Invalid JSON' });
+    return createResponse({ status: 'error', message: 'Invalid JSON: ' + err.toString() });
   }
-  
+
   const action = data.action;
   if (action === 'addTransaction') return addTransaction(data.payload);
   if (action === 'updateTransaction') return updateTransaction(data.payload);
@@ -30,8 +41,7 @@ function doPost(e) {
   if (action === 'addParty') return addParty(data.payload);
   if (action === 'updateParty') return updateParty(data.payload);
   if (action === 'deleteParty') return deleteParty(data.payload.id);
-  if (action === 'uploadFiles') return uploadFiles(data.payload);
-  
+
   return createResponse({ status: 'error', message: 'Unknown action' });
 }
 
@@ -137,48 +147,33 @@ function logDebug(msg) {
   } catch(e) {}
 }
 
-function uploadFiles(payload) {
-  logDebug('uploadFiles called. txId=' + payload.txId + ' files=' + (payload.files ? payload.files.length : 0));
+function uploadSingleFile(txId, fileName, fileType, base64Data) {
+  logDebug('uploadSingleFile: txId=' + txId + ' file=' + fileName + ' base64len=' + (base64Data ? base64Data.length : 0));
 
   let folder;
   try {
     const folders = DriveApp.getFoldersByName("WTR_Receipts");
     if (folders.hasNext()) {
       folder = folders.next();
-      logDebug('Found folder: ' + folder.getName());
     } else {
       folder = DriveApp.createFolder("WTR_Receipts");
-      logDebug('Created new folder: WTR_Receipts');
+      logDebug('Created folder WTR_Receipts');
     }
   } catch (folderErr) {
     logDebug('Folder error: ' + folderErr.toString());
-    return createResponse({ status: 'error', message: folderErr.toString() });
+    return createResponse({ status: 'error', message: 'Folder error: ' + folderErr.toString() });
   }
 
-  const urls = [];
-  if (payload.files && payload.files.length > 0) {
-    payload.files.forEach(function(file) {
-      try {
-        const fileName = (payload.txId || Date.now()) + "_" + file.name;
-        const base64Data = file.base64.split(',')[1];
-        logDebug('Uploading: ' + fileName + ' base64len=' + (base64Data ? base64Data.length : 'null'));
-        const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), file.type, fileName);
-        const uploadedFile = folder.createFile(blob);
-        uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        // แปลง URL เป็นรูปแบบที่ใช้ใน <img> ได้โดยตรง
-        const fileId = uploadedFile.getId();
-        const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
-        urls.push(viewUrl);
-        logDebug('Upload OK: ' + viewUrl);
-      } catch (err) {
-        logDebug('Upload error: ' + err.toString());
-      }
-    });
-  }
+  try {
+    const safeFileName = (txId || Date.now()) + '_' + fileName;
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), fileType, safeFileName);
+    const uploadedFile = folder.createFile(blob);
+    uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    const viewUrl = 'https://drive.google.com/uc?export=view&id=' + uploadedFile.getId();
+    logDebug('Upload OK: ' + viewUrl);
 
-  // อัปเดต receiptUrl ในชีทอัตโนมัติ
-  if (urls.length > 0 && payload.txId) {
-    try {
+    // อัปเดต receiptUrl ในชีทอัตโนมัติ
+    if (txId) {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
       const sheet = ss.getSheetByName('Transactions');
       const data = sheet.getDataRange().getValues();
@@ -186,20 +181,20 @@ function uploadFiles(payload) {
       const idCol = headers.indexOf('id');
       const receiptCol = headers.indexOf('receiptUrl');
       for (var i = 1; i < data.length; i++) {
-        if (data[i][idCol].toString() === payload.txId.toString()) {
-          sheet.getRange(i + 1, receiptCol + 1).setValue(urls.join(", "));
-          logDebug('Sheet updated receiptUrl for txId=' + payload.txId);
+        if (data[i][idCol].toString() === txId.toString()) {
+          const existing = data[i][receiptCol] ? data[i][receiptCol] + ', ' : '';
+          sheet.getRange(i + 1, receiptCol + 1).setValue(existing + viewUrl);
+          logDebug('Sheet updated: txId=' + txId);
           break;
         }
       }
-    } catch (sheetErr) {
-      logDebug('Sheet update error: ' + sheetErr.toString());
     }
-  } else {
-    logDebug('No URLs to update. urls.length=' + urls.length);
-  }
 
-  return createResponse({ status: 'success', urls: urls });
+    return createResponse({ status: 'success', url: viewUrl });
+  } catch (err) {
+    logDebug('Upload error: ' + err.toString());
+    return createResponse({ status: 'error', message: err.toString() });
+  }
 }
 
 function addParty(payload) {
