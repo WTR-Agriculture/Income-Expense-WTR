@@ -405,9 +405,9 @@ export default function App() {
     const uploadInBackground = async (tx) => {
       await submitToSheet(tx);
 
-      console.log("imagesToUpload count:", imagesToUpload.length, "isOnline:", isOnline);
+      console.log("imagesToUpload count:", imagesToUpload.length);
 
-      if (!isOnline || imagesToUpload.length === 0) {
+      if (imagesToUpload.length === 0) {
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 2000);
         return;
