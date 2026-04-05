@@ -350,10 +350,14 @@ export default function App() {
     setEditingTxId(null);
     setSelectedImages([]);
     const defaultBusiness = activeBusinessId === 'all' ? '' : activeBusinessId;
+    const initialCategory = (categories[defaultBusiness] && categories[defaultBusiness][type][0]) || 'ทั่วไป';
     setFormData({
-      date: new Date().toISOString().split('T')[0], partyName: '', itemName: '', unitPrice: '', quantity: '1',
-      category: (categories[defaultBusiness] && categories[defaultBusiness][type][0]) || '',
-      paymentMethod: 'cash', business: defaultBusiness, refjob: ''
+      date: new Date().toISOString().split('T')[0],
+      partyName: '',
+      items: [{ id: Date.now(), itemName: '', unitPrice: '', quantity: '1', category: initialCategory }],
+      paymentMethod: 'cash',
+      business: defaultBusiness,
+      refjob: ''
     });
     setIsModalOpen(true);
   };
@@ -402,142 +406,130 @@ export default function App() {
 
   const handleFormSubmit = async (e) => {
     if (e) e.preventDefault();
-    const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
-    if (finalAmount <= 0) return;
-    // บังคับเลือกธุรกิจเมื่ออยู่ในโหมดเครือ WTR
     if (activeBusinessId === 'all' && !formData.business) {
       alert('กรุณาเลือกธุรกิจก่อนบันทึกรายการค่ะ');
       return;
     }
 
-    // สร้าง transaction ทันทีโดยไม่รอรูป
-    const txId = isEditMode ? editingTxId : Date.now();
-    const newTx = {
-      id: txId,
+    if (formData.items.some(it => !it.itemName.trim() || parseFloat(it.unitPrice) <= 0)) {
+      alert('กรุณากรอกข้อมูลรายการและราคาให้ครบถ้วนนะคะ');
+      return;
+    }
+
+    const batchId = Date.now();
+    const commonMetadata = {
       type: modalType,
       date: formData.date,
       party: formData.partyName || 'ทั่วไป',
-      desc: formData.itemName || (modalType === 'income' ? 'รายรับ' : 'รายจ่าย'),
-      amount: finalAmount,
       method: formData.paymentMethod,
-      time: isEditMode
+      time: isEditMode 
         ? transactions.find(t => t.id === editingTxId)?.time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
         : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-      category: formData.category,
-      receiptUrl: isEditMode ? transactions.find(t => t.id === editingTxId)?.receiptUrl || "" : "",
       business: formData.business,
-      refjob: formData.refjob
+      refjob: formData.refjob,
+      receiptUrl: isEditMode ? transactions.find(t => t.id === editingTxId)?.receiptUrl || "" : "" 
     };
 
-    // บันทึกลง state ทันที → ปิด modal ทันที
+    const newTransactions = formData.items.map((it, idx) => ({
+      ...commonMetadata,
+      id: isEditMode ? editingTxId : batchId + idx,
+      desc: it.itemName,
+      amount: parseFloat(it.unitPrice) * parseFloat(it.quantity),
+      category: it.category
+    }));
+
+    // 1. Update local state immediately
     if (isEditMode) {
-      setTransactions(prev => prev.map(t => t.id === txId ? newTx : t));
+      setTransactions(prev => prev.map(t => t.id === editingTxId ? newTransactions[0] : t));
     } else {
-      setTransactions(prev => [newTx, ...prev]);
+      setTransactions(prev => [...newTransactions, ...prev]);
     }
+    
     setIsModalOpen(false);
-    setIsEditMode(false);
-    setEditingTxId(null);
     const imagesToUpload = [...selectedImages];
+    const editingId = editingTxId;
+    const isEditing = isEditMode;
     setSelectedImages([]);
     setSyncStatus('syncing');
 
-    // ——— ส่งข้อมูล (ไม่มีรูป) ขึ้น Google Sheets ก่อน ———
-    const submitToSheet = async (tx) => {
+    // 2. Upload to Google Sheets
+    const saveToSheets = async () => {
       try {
-        const action = isEditMode ? 'updateTransaction' : 'addTransaction';
-        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, payload: tx }), redirect: 'follow' });
-      } catch (err) { console.error("Sheet sync failed:", err); }
-    };
+        if (isEditing) {
+          await fetch(API_URL, { 
+            method: 'POST', 
+            body: JSON.stringify({ action: 'updateTransaction', payload: newTransactions[0] }), 
+            redirect: 'follow' 
+          });
+        } else {
+          await fetch(API_URL, { 
+            method: 'POST', 
+            body: JSON.stringify({ action: 'addTransactionsBatch', payload: newTransactions }), 
+            redirect: 'follow' 
+          });
+        }
+        
+        // 3. Handle Cloudinary Images if any
+        if (imagesToUpload.length > 0) {
+          const CLOUDINARY_CLOUD = 'djrwxouxx';
+          const CLOUDINARY_PRESET = 'wtr_receipts';
+          const uploadedUrls = [];
 
-    // ——— Cloudinary Config ———
-    const CLOUDINARY_CLOUD = 'djrwxouxx';
-    const CLOUDINARY_PRESET = 'wtr_receipts';
+          for (const img of imagesToUpload) {
+            const fd = new FormData();
+            fd.append('file', img.base64);
+            fd.append('upload_preset', CLOUDINARY_PRESET);
+            fd.append('folder', 'wtr_receipts');
+            
+            const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: fd });
+            const data = await res.json();
+            if (data.secure_url) uploadedUrls.push(data.secure_url);
+          }
 
-    // ——— อัปโหลดรูปผ่าน Cloudinary แล้วอัปเดต Sheet ———
-    const uploadInBackground = async (tx) => {
-      await submitToSheet(tx);
-
-      console.log("imagesToUpload count:", imagesToUpload.length);
-
-      if (imagesToUpload.length === 0) {
+          if (uploadedUrls.length > 0) {
+            const finalUrl = uploadedUrls.join(', ');
+            const targetIds = isEditing ? [editingId] : newTransactions.map(t => t.id);
+            
+            // Update local state with URLs
+            setTransactions(prev => prev.map(t => 
+              targetIds.includes(t.id) ? { ...t, receiptUrl: finalUrl } : t
+            ));
+            
+            // Update Sheets with URLs
+            await fetch(API_URL, {
+              method: 'POST',
+              body: JSON.stringify({ 
+                action: 'updateTransactionsBatchReceiptUrl', 
+                payload: { ids: targetIds, url: finalUrl } 
+              }),
+              redirect: 'follow'
+            });
+          }
+        }
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 2000);
-        return;
+      } catch (err) {
+        console.error("Submission failed:", err);
+        setSyncStatus('error');
       }
-
-      const urls = [];
-      for (const img of imagesToUpload) {
-        try {
-          const formData = new FormData();
-          formData.append('file', img.base64);          // รับ data URL ตรงๆ
-          formData.append('upload_preset', CLOUDINARY_PRESET);
-          formData.append('folder', 'wtr_receipts');
-
-          console.log("Uploading to Cloudinary:", img.file.name);
-          const res = await fetch(
-            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`,
-            { method: 'POST', body: formData }
-          );
-          const data = await res.json();
-          if (data.secure_url) {
-            urls.push(data.secure_url);
-            console.log("Cloudinary upload OK:", data.secure_url);
-          } else {
-            console.error("Cloudinary error:", data);
-          }
-        } catch (err) {
-          console.error("Upload failed:", err);
-        }
-      }
-
-      // อัปเดต receiptUrl ใน Sheet ทันที
-      if (urls.length > 0) {
-        const receiptUrl = urls.join(', ');
-        // อัปเดต state ทันที
-        setTransactions(prev => prev.map(t =>
-          t.id?.toString() === tx.id?.toString() ? { ...t, receiptUrl } : t
-        ));
-        // บันทึกลง Sheet
-        try {
-          await fetch(API_URL, {
-            method: 'POST',
-            body: JSON.stringify({ action: 'updateTransaction', payload: { ...tx, receiptUrl } }),
-            redirect: 'follow'
-          });
-          console.log("Sheet updated with receiptUrl:", receiptUrl);
-        } catch (err) {
-          console.error("Sheet update failed:", err);
-        }
-      }
-
-      setSyncStatus('success');
-      setTimeout(() => setSyncStatus('idle'), 2000);
     };
 
-    const submitTransaction = async (finalPartyName) => {
-      const finalTx = { ...newTx, party: finalPartyName || newTx.party };
-      setIsNewPartyPromptOpen(false);
-      uploadInBackground(finalTx); // ไม่รอ (no await)
-    };
-
-    // Check for NEW PARTY
+    // 4. Check for New Party before final save
     const partyExists = parties.some(p => p.name.trim().toLowerCase() === formData.partyName.trim().toLowerCase());
-    if (!partyExists && formData.partyName.trim() !== '' && formData.partyName.trim() !== 'ทั่วไป' && !isEditMode) {
+    if (!partyExists && formData.partyName.trim() !== '' && formData.partyName.trim() !== 'ทั่วไป') {
       setTempNewPartyName(formData.partyName.trim());
-      setTempReceiptUrls('');
       setIsNewPartyPromptOpen(true);
-      // เก็บ pending tx ไว้ใช้ตอน confirm
-      window._pendingTx = newTx;
-      window._pendingImages = imagesToUpload;
+      window._pendingSubmit = saveToSheets;
     } else {
-      submitTransaction(formData.partyName.trim());
+      saveToSheets();
     }
+    setIsEditMode(false);
+    setEditingTxId(null);
   };
 
   const handleConfirmNewPartySave = async (shouldSave) => {
+    setIsNewPartyPromptOpen(false);
     if (shouldSave) {
-      // เช็คก่อนว่ายังไม่มีชื่อนี้ในระบบ (กัน edge case)
       const alreadyExists = parties.some(
         p => p.name.trim().toLowerCase() === tempNewPartyName.trim().toLowerCase()
       );
@@ -545,64 +537,10 @@ export default function App() {
         await handleAddParty({ name: tempNewPartyName, type: modalType === 'income' ? 'customer' : 'supplier' });
       }
     }
-    await finalizeSubmissionWithParty(tempNewPartyName);
-  };
-
-  const finalizeSubmissionWithParty = async (partyName) => {
-    const CLOUDINARY_CLOUD = 'djrwxouxx';
-    const CLOUDINARY_PRESET = 'wtr_receipts';
-    const pendingImages = window._pendingImages || [];
-    const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
-    const txId = Date.now();
-    const newTx = {
-      id: txId,
-      type: modalType,
-      date: formData.date,
-      party: partyName,
-      desc: formData.itemName || (modalType === 'income' ? 'รายรับ' : 'รายจ่าย'),
-      amount: finalAmount,
-      method: formData.paymentMethod,
-      time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-      category: formData.category,
-      receiptUrl: '',
-      business: formData.business,
-      refjob: formData.refjob
-    };
-    setTransactions(prev => [newTx, ...prev]);
-    setIsModalOpen(false);
-    setIsNewPartyPromptOpen(false);
-    setTempReceiptUrls('');
-    window._pendingImages = [];
-    setSyncStatus('syncing');
-    try {
-      await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addTransaction', payload: newTx }), redirect: 'follow' });
-    } catch (err) { console.error('addTransaction failed:', err); }
-
-    // อัปโหลดรูป (ถ้ามี)
-    console.log('finalizeSubmissionWithParty: pendingImages count:', pendingImages.length);
-    const urls = [];
-    for (const img of pendingImages) {
-      try {
-        const formData2 = new FormData();
-        formData2.append('file', img.base64);
-        formData2.append('upload_preset', CLOUDINARY_PRESET);
-        formData2.append('folder', 'wtr_receipts');
-        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: formData2 });
-        const data = await res.json();
-        if (data.secure_url) { urls.push(data.secure_url); console.log('Cloudinary OK:', data.secure_url); }
-        else { console.error('Cloudinary error:', data); }
-      } catch (err) { console.error('Upload error:', err); }
+    if (window._pendingSubmit) {
+      await window._pendingSubmit();
+      window._pendingSubmit = null;
     }
-    if (urls.length > 0) {
-      const receiptUrl = urls.join(', ');
-      setTransactions(prev => prev.map(t => t.id === txId ? { ...t, receiptUrl } : t));
-      try {
-        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateTransaction', payload: { ...newTx, receiptUrl } }), redirect: 'follow' });
-        console.log('Sheet updated with receiptUrl:', receiptUrl);
-      } catch (err) { console.error('Sheet update failed:', err); }
-    }
-    setSyncStatus('success');
-    setTimeout(() => setSyncStatus('idle'), 2000);
   };
 
   const [isAddBusinessModalOpen, setIsAddBusinessModalOpen] = useState(false);
@@ -654,10 +592,7 @@ export default function App() {
     setFormData({
       date: tx.date || new Date().toISOString().split('T')[0],
       partyName: tx.party || '',
-      itemName: tx.desc || '',
-      unitPrice: tx.amount || '',
-      quantity: '1',
-      category: tx.category || '',
+      items: [{ id: tx.id, itemName: tx.desc || '', unitPrice: tx.amount || '', quantity: '1', category: tx.category || '' }],
       paymentMethod: tx.method || 'cash',
       business: tx.business || 'garage',
       refjob: tx.refjob || ''
@@ -1317,20 +1252,108 @@ export default function App() {
                 </div>
               </div>
 
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-base" /></div>
-                <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">หมวดหมู่ ({formData.business})</label><select value={formData.category} onChange={e => setFormData({ ...formData, category: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-base appearance-none">{(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+              {/* Items List */}
+              <div className="space-y-4">
+                <div className="flex justify-between items-center mb-2 px-1">
+                  <label className="text-[10px] font-black uppercase opacity-40">รายการสินค้า/บริการ</label>
+                  <button type="button" onClick={() => setFormData({ ...formData, items: [...formData.items, { id: Date.now(), itemName: '', unitPrice: '', quantity: '1', category: (categories[formData.business]?.[modalType]?.[0]) || 'ทั่วไป' }] })} className="text-[#AE88F9] hover:text-[#AE88F9]/80 flex items-center gap-1.5 transition-all group">
+                    <div className="bg-[#AE88F9]/10 p-1 rounded-lg group-hover:scale-110"><Plus size={14} className="font-black" /></div>
+                    <span className="text-[10px] font-black uppercase tracking-widest">เพิ่มรายการย่อย</span>
+                  </button>
+                </div>
+                
+                <div className="space-y-3">
+                  {formData.items.map((item, index) => (
+                    <div key={item.id} className="bg-[#F8F7FA] p-4 md:p-6 rounded-[28px] border-2 border-transparent hover:border-[#EAE3F4] transition-all animate-in slide-in-from-left duration-300">
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                        <div className="relative">
+                          <input 
+                            type="text" 
+                            placeholder="ชื่อรายการ..." 
+                            value={item.itemName} 
+                            onChange={e => {
+                              const newItems = [...formData.items];
+                              newItems[index].itemName = e.target.value;
+                              setFormData({ ...formData, items: newItems });
+                            }} 
+                            className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm focus:ring-2 focus:ring-[#AE88F9]/20" 
+                          />
+                        </div>
+                        <select 
+                          value={item.category} 
+                          onChange={e => {
+                            const newItems = [...formData.items];
+                            newItems[index].category = e.target.value;
+                            setFormData({ ...formData, items: newItems });
+                          }} 
+                          className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm appearance-none border-none">
+                          {(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}
+                        </select>
+                      </div>
+                      
+                      <div className="flex items-center gap-3">
+                        <div className="flex-1 flex gap-2">
+                          <div className="flex-1">
+                            <label className="text-[8px] font-black uppercase opacity-30 ml-2 mb-1 block">ราคา</label>
+                            <input 
+                              type="number" 
+                              placeholder="ราคา" 
+                              value={item.unitPrice} 
+                              onChange={e => {
+                                const newItems = [...formData.items];
+                                newItems[index].unitPrice = e.target.value;
+                                setFormData({ ...formData, items: newItems });
+                              }} 
+                              className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm" 
+                            />
+                          </div>
+                          <div className="w-20">
+                            <label className="text-[8px] font-black uppercase opacity-30 ml-2 mb-1 block">จำนวน</label>
+                            <input 
+                              type="number" 
+                              placeholder="จำนวน" 
+                              value={item.quantity} 
+                              onChange={e => {
+                                const newItems = [...formData.items];
+                                newItems[index].quantity = e.target.value;
+                                setFormData({ ...formData, items: newItems });
+                              }} 
+                              className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm text-center" 
+                            />
+                          </div>
+                        </div>
+                        
+                        {formData.items.length > 1 && (
+                          <div className="pt-5">
+                            <button type="button" onClick={() => setFormData({ ...formData, items: formData.items.filter((_, i) => i !== index) })} className="p-3 text-red-400 hover:bg-red-50 rounded-xl transition-all">
+                              <Trash2 size={18} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
               </div>
 
-              <div className="flex flex-col sm:flex-row gap-3">
-                <div className="flex-1 relative">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm" /></div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">เลขที่อ้างอิงเอกสาร (refjob)</label>
+                  <input type="text" placeholder="ระบุเลขที่บิล/อ้างอิง..." value={formData.refjob} onChange={e => setFormData({ ...formData, refjob: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm focus:border-[#AE88F9] border-2 border-dashed border-[#EAE3F4]" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5 md:space-y-2">
+                <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">รับจากลูกค้า / จ่ายให้ร้านค้า</label>
+                <div className="relative">
                   <input
                     type="text"
                     list="parties-list"
-                    placeholder={modalType === 'income' ? 'รับจากลูกค้า...' : 'จ่ายให้ร้านค้า...'}
+                    placeholder={modalType === 'income' ? 'ระบุชื่อลูกค้า...' : 'ระบุชื่อร้านค้า...'}
                     value={formData.partyName}
                     onChange={e => setFormData({ ...formData, partyName: e.target.value })}
-                    className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition"
+                    className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-sm focus:border-black border-2 border-transparent transition"
                   />
                   <datalist id="parties-list">
                     {sortedPartiesByFrequency
@@ -1339,18 +1362,11 @@ export default function App() {
                     }
                   </datalist>
                 </div>
-                <input type="text" placeholder="เลขที่อ้างอิงเอกสาร (refjob)..." value={formData.refjob} onChange={e => setFormData({ ...formData, refjob: e.target.value })} className="flex-1 bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-[#AE88F9] border-2 border-dashed border-[#EAE3F4]" />
               </div>
-              <input type="text" placeholder="พิมพ์ชื่อรายการ..." value={formData.itemName} onChange={e => setFormData({ ...formData, itemName: e.target.value })} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition" />
 
               <div className="grid grid-cols-2 gap-3">
                 <button type="button" onClick={() => setFormData({ ...formData, paymentMethod: 'cash' })} className={`py-4 rounded-2xl font-black text-xs border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'cash' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><Wallet size={16} /> เงินสด</button>
                 <button type="button" onClick={() => setFormData({ ...formData, paymentMethod: 'transfer' })} className={`py-4 rounded-2xl font-black text-xs border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'transfer' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><ArrowRightLeft size={16} /> เงินโอน</button>
-              </div>
-
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">ราคา</label><input type="number" value={formData.unitPrice} onChange={e => setFormData({ ...formData, unitPrice: e.target.value })} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-base" /></div>
-                <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">จำนวน</label><input type="number" value={formData.quantity} onChange={e => setFormData({ ...formData, quantity: e.target.value })} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-base" /></div>
               </div>
 
               <div className="space-y-2">
@@ -1362,8 +1378,10 @@ export default function App() {
               </div>
 
               <div className="p-6 bg-[#1D1B20] text-center rounded-[24px]">
-                <p className="text-[9px] font-black text-white/50 mb-1 uppercase tracking-widest">ยอดรวมสุทธิ</p>
-                <h3 className="text-2xl font-black text-[#DDFD54]">{formatCurrency((parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0)}</h3>
+                <p className="text-[9px] font-black text-white/50 mb-1 uppercase tracking-widest">ยอดรวมตามใบเสร็จ (Grand Total)</p>
+                <h3 className="text-2xl font-black text-[#DDFD54]">
+                  {formatCurrency(formData.items.reduce((sum, it) => sum + (parseFloat(it.unitPrice) * parseFloat(it.quantity) || 0), 0))}
+                </h3>
               </div>
               <button type="submit" disabled={syncStatus === 'syncing'} className={`w-full py-5 rounded-full text-lg font-black transition-all shadow-2xl flex items-center justify-center gap-3 ${modalType === 'income' ? 'bg-[#DDFD54] text-[#1D1B20]' : 'bg-[#AE88F9] text-white'}`}>{syncStatus === 'syncing' ? <RefreshCcw className="animate-spin" /> : <CloudUpload />} {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 'ยืนยันการบันทึกรายการ'}</button>
             </form>

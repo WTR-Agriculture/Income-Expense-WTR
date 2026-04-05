@@ -34,7 +34,9 @@ function doPost(e) {
 
   const action = data.action;
   if (action === 'addTransaction') return addTransaction(data.payload);
+  if (action === 'addTransactionsBatch') return addTransactionsBatch(data.payload);
   if (action === 'updateTransaction') return updateTransaction(data.payload);
+  if (action === 'updateTransactionsBatchReceiptUrl') return updateTransactionsBatchReceiptUrl(data.payload);
   if (action === 'deleteTransaction') return deleteTransaction(data.payload.id);
   if (action === 'addCategory') return addCategory(data.payload);
   if (action === 'addBusiness') return addBusiness(data.payload);
@@ -43,6 +45,36 @@ function doPost(e) {
   if (action === 'deleteParty') return deleteParty(data.payload.id);
 
   return createResponse({ status: 'error', message: 'Unknown action' });
+}
+
+function addTransactionsBatch(payloadArray) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Transactions');
+  const headers = sheet.getDataRange().getValues()[0];
+  const newRows = payloadArray.map(payload => headers.map(h => payload[h] || ""));
+  sheet.getRange(sheet.getLastRow() + 1, 1, newRows.length, headers.length).setValues(newRows);
+  return createResponse({ status: 'success', count: newRows.length });
+}
+
+function updateTransactionsBatchReceiptUrl(payload) {
+  const { ids, url } = payload;
+  if (!ids || !url) return createResponse({ status: 'error', message: 'Missing ids or url' });
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Transactions');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  const receiptCol = headers.indexOf('receiptUrl');
+  
+  const idSet = new Set(ids.map(id => id.toString()));
+  let count = 0;
+  for (let i = 1; i < data.length; i++) {
+    if (idSet.has(data[i][idCol].toString())) {
+      sheet.getRange(i + 1, receiptCol + 1).setValue(url);
+      count++;
+    }
+  }
+  return createResponse({ status: 'success', updated: count });
 }
 
 function getJsonData(sheetName) {
@@ -107,6 +139,21 @@ function updateTransaction(payload) {
     }
   }
   return createResponse({ status: 'error', message: 'Transaction not found' });
+}
+
+function updateTransactionsBatchReceiptUrl(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Transactions');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  const receiptCol = headers.indexOf('receiptUrl');
+  const idsStrs = payload.ids.map(id => id.toString());
+  
+  for (let i = 1; i < data.length; i++) {
+    }
+  }
+  return createResponse({ status: 'success' });
 }
 
 function deleteTransaction(id) {
