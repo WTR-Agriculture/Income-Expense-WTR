@@ -7,47 +7,40 @@ import {
   Home, PieChart, Settings, Search, Filter,
   Download, TrendingUp, TrendingDown, ChevronDown, List,
   Building2, Users, Database, Trash2, Bell, Shield, LogOut,
-  ChevronRight, Trash, RefreshCcw, Wifi, WifiOff, CloudUpload, Image as ImageIcon
+  ChevronRight, Trash, RefreshCcw, Wifi, WifiOff, CloudUpload, Image as ImageIcon,
+  Wrench, Leaf, ShoppingCart, Tractor, Factory
 } from 'lucide-react';
 
-// Constants for Local Storage keys
 const STORAGE_KEYS = {
   TRANSACTIONS: 'wtr_ledger_transactions',
   CATEGORIES: 'wtr_ledger_categories',
-  BUSINESS_PROFILE: 'wtr_ledger_business_profile',
-  TEAM_MEMBERS: 'wtr_ledger_team_members'
+  BUSINESSES: 'wtr_ledger_businesses'
 };
 
 const API_URL = 'https://script.google.com/macros/s/AKfycbxF8UafxvgTgEvW80v-p9OJcAAurVh9BhFlXK06eXDM9v2hCzuJ_QA6aPI3uc7QOWEboA/exec';
 
-const DEFAULT_CATEGORIES = {
-  expense: ['ค่าวัสดุ/อุปกรณ์', 'ค่าน้ำ/ค่าไฟ', 'ค่าของกิน', 'ค่าเครื่องมือ', 'อื่นๆ'],
-  income: ['งานต่อเรือ', 'งานตัดเลเซอร์', 'งานประกอบท่อ', 'ขายเศษวัสดุ', 'อื่นๆ']
-};
-
-const DEFAULT_BUSINESS_PROFILE = {
-  name: "WTR Garage Co., Ltd.",
-  taxId: "0123456789012",
-  address: "123 หมู่ 4 ต.บ้านไร่ อ.ดำเนินสะดวก จ.ราชบุรี 70130"
-};
-
-const DEFAULT_TEAM_MEMBERS = [
-  { id: 1, name: 'WTR Admin', role: 'เจ้าของกิจการ', access: 'Full Access', initial: 'W' },
-  { id: 2, name: 'สมศรี บัญชี', role: 'เสมียน', access: 'บันทึกรายการ', initial: 'S' }
+const DEFAULT_BUSINESSES = [
+  { id: 'garage', name: 'อู่', icon: 'Wrench' }
 ];
 
+const DEFAULT_CATEGORIES = {
+  garage: {
+    expense: ['ค่าวัสดุ/อุปกรณ์', 'ค่าน้ำ/ค่าไฟ', 'ค่าของกิน', 'ค่าเครื่องมือ', 'อื่นๆ'],
+    income: ['งานต่อเรือ', 'งานตัดเลเซอร์', 'งานประกอบท่อ', 'ขายเศษวัสดุ', 'อื่นๆ']
+  }
+};
+
+const ICON_MAP = { Wrench, Leaf, ShoppingCart, Tractor, Factory, Briefcase };
+
 export default function App() {
-  // Navigation & UI State
+  // Navigation & Multi-Business State
   const [activeTab, setActiveTab] = useState('dashboard');
+  const [activeBusinessId, setActiveBusinessId] = useState('garage');
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalType, setModalType] = useState('expense');
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
-  const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
-  const [breakdownType, setBreakdownType] = useState('income'); 
-  const [isAddUserModalOpen, setIsAddUserModalOpen] = useState(false);
   const [reportPeriod, setReportPeriod] = useState('monthly');
-  const [newUserRole, setNewUserRole] = useState('admin');
   
   // Sync State
   const [syncStatus, setSyncStatus] = useState('idle'); 
@@ -58,6 +51,11 @@ export default function App() {
   const fileInputRef = useRef(null);
 
   // Data State with Cache
+  const [businesses, setBusinesses] = useState(() => {
+    const saved = localStorage.getItem(STORAGE_KEYS.BUSINESSES);
+    return saved ? JSON.parse(saved) : DEFAULT_BUSINESSES;
+  });
+
   const [transactions, setTransactions] = useState(() => {
     const saved = localStorage.getItem(STORAGE_KEYS.TRANSACTIONS);
     return saved ? JSON.parse(saved) : [];
@@ -68,21 +66,10 @@ export default function App() {
     return saved ? JSON.parse(saved) : DEFAULT_CATEGORIES;
   });
 
-  const [businessProfile, setBusinessProfile] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.BUSINESS_PROFILE);
-    return saved ? JSON.parse(saved) : DEFAULT_BUSINESS_PROFILE;
-  });
-
-  const [teamMembers, setTeamMembers] = useState(() => {
-    const saved = localStorage.getItem(STORAGE_KEYS.TEAM_MEMBERS);
-    return saved ? JSON.parse(saved) : DEFAULT_TEAM_MEMBERS;
-  });
-
-  // Sync to Storage
+  // Persist Local Cache
+  useEffect(() => { localStorage.setItem(STORAGE_KEYS.BUSINESSES, JSON.stringify(businesses)); }, [businesses]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.TRANSACTIONS, JSON.stringify(transactions)); }, [transactions]);
   useEffect(() => { localStorage.setItem(STORAGE_KEYS.CATEGORIES, JSON.stringify(categories)); }, [categories]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.BUSINESS_PROFILE, JSON.stringify(businessProfile)); }, [businessProfile]);
-  useEffect(() => { localStorage.setItem(STORAGE_KEYS.TEAM_MEMBERS, JSON.stringify(teamMembers)); }, [teamMembers]);
 
   // Online Detection
   useEffect(() => {
@@ -105,64 +92,62 @@ export default function App() {
         const sanitized = txData.map(t => ({
           ...t,
           amount: parseFloat(t.amount) || 0,
+          business: t.business || 'garage',
           date: t.date && t.date.toString().startsWith("1899") ? new Date().toISOString().split('T')[0] : (t.date ? t.date.toString().split('T')[0] : new Date().toISOString().split('T')[0])
         }));
         setTransactions(sanitized);
       }
 
+      const bisRes = await fetch(`${API_URL}?action=getBusinesses`, { redirect: 'follow' });
+      const bisData = await bisRes.json();
+      if (Array.isArray(bisData) && bisData.length > 0) setBusinesses(bisData);
+
       const catRes = await fetch(`${API_URL}?action=getCategories`, { redirect: 'follow' });
       const catData = await catRes.json();
       if (Array.isArray(catData)) {
-        const newCats = { income: [], expense: [] };
+        const newCats = {};
         catData.forEach(c => {
-          if (c.type === 'income') newCats.income.push(c.item || c.name);
-          if (c.type === 'expense') newCats.expense.push(c.item || c.name);
+          const bId = c.businessId || 'garage';
+          if (!newCats[bId]) newCats[bId] = { income: [], expense: [] };
+          newCats[bId][c.type].push(c.name);
         });
-        if (newCats.income.length > 0 || newCats.expense.length > 0) setCategories(newCats);
+        if (Object.keys(newCats).length > 0) setCategories(prev => ({ ...prev, ...newCats }));
       }
       setSyncStatus('success');
       setTimeout(() => setSyncStatus('idle'), 3000);
-    } catch (error) {
-      setSyncStatus('error');
-    }
+    } catch (error) { setSyncStatus('error'); }
   }, [isOnline]);
 
   useEffect(() => { syncWithGoogleSheets(); }, [syncWithGoogleSheets]);
 
-  // Calculations
+  // Calculations (Filtered by Active Business)
+  const filteredTransactions = useMemo(() => {
+    if (activeBusinessId === 'all') return transactions;
+    return transactions.filter(t => t.business === activeBusinessId);
+  }, [transactions, activeBusinessId]);
+
   const totals = useMemo(() => {
-    const income = transactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-    const expense = transactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
     return { income, expense, balance: income - expense };
-  }, [transactions]);
+  }, [filteredTransactions]);
 
   const breakdownData = useMemo(() => {
     const calc = (type) => {
       const now = new Date();
-      const filtered = transactions.filter(t => {
+      const filtered = filteredTransactions.filter(t => {
         if (t.type !== type) return false;
         if (!t.date) return true;
         const tDate = new Date(t.date);
-        
-        if (reportPeriod === 'daily') {
-          return tDate.toDateString() === now.toDateString();
-        } else if (reportPeriod === 'weekly') {
-          const diff = now.getTime() - tDate.getTime();
-          return diff <= 7 * 24 * 60 * 60 * 1000;
-        } else if (reportPeriod === 'monthly') {
-          return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-        } else if (reportPeriod === 'yearly') {
-          return tDate.getFullYear() === now.getFullYear();
-        }
+        if (reportPeriod === 'daily') return tDate.toDateString() === now.toDateString();
+        if (reportPeriod === 'weekly') return (now.getTime() - tDate.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+        if (reportPeriod === 'monthly') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+        if (reportPeriod === 'yearly') return tDate.getFullYear() === now.getFullYear();
         return true;
       });
-
       const total = filtered.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
       const categoryMap = {};
-      filtered.forEach(t => {
-          const cat = t.category || 'อื่นๆ';
-          categoryMap[cat] = (categoryMap[cat] || 0) + (parseFloat(t.amount) || 0);
-      });
+      filtered.forEach(t => categoryMap[t.category || 'อื่นๆ'] = (categoryMap[t.category || 'อื่นๆ'] || 0) + (parseFloat(t.amount) || 0));
       const items = Object.entries(categoryMap).map(([name, amount]) => ({
         name, amount, percent: total > 0 ? Math.round((amount / total) * 100) : 0,
         color: type === 'income' ? '#DDFD54' : '#AE88F9'
@@ -170,21 +155,23 @@ export default function App() {
       return { total, items };
     };
     return { income: calc('income'), expense: calc('expense') };
-  }, [transactions, reportPeriod]);
+  }, [filteredTransactions, reportPeriod]);
 
-  // Form Handlers
+  // Form State
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '', itemName: '', unitPrice: '', quantity: '1',
-    totalAmount: '', category: '', paymentMethod: 'cash',
+    category: '', paymentMethod: 'cash', business: 'garage'
   });
 
   const handleOpenModal = (type) => {
     setModalType(type);
     setSelectedImages([]);
+    const defaultBusiness = activeBusinessId === 'all' ? 'garage' : activeBusinessId;
     setFormData({
       date: new Date().toISOString().split('T')[0], partyName: '', itemName: '', unitPrice: '', quantity: '1',
-      totalAmount: '', category: categories[type][0] || '', paymentMethod: 'cash',
+      category: (categories[defaultBusiness] && categories[defaultBusiness][type][0]) || '', 
+      paymentMethod: 'cash', business: defaultBusiness
     });
     setIsModalOpen(true);
   };
@@ -194,25 +181,16 @@ export default function App() {
     files.forEach(file => {
       const reader = new FileReader();
       reader.onloadend = () => {
-        setSelectedImages(prev => [...prev, {
-          id: Math.random().toString(36).substr(2, 9),
-          file: file,
-          preview: URL.createObjectURL(file),
-          base64: reader.result
-        }]);
+        setSelectedImages(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), file: file, preview: URL.createObjectURL(file), base64: reader.result }]);
       };
       reader.readAsDataURL(file);
     });
   };
 
-  const removeImage = (id) => {
-    setSelectedImages(prev => prev.filter(img => img.id !== id));
-  };
-
   const handleFormSubmit = async (e) => {
     if (e) e.preventDefault();
-    const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || parseFloat(formData.totalAmount);
-    if (!finalAmount || finalAmount <= 0) return;
+    const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
+    if (finalAmount <= 0) return;
 
     setSyncStatus('syncing');
     let receiptUrls = "";
@@ -221,25 +199,11 @@ export default function App() {
       try {
         const uploadRes = await fetch(API_URL, {
           method: 'POST',
-          body: JSON.stringify({
-            action: 'uploadFiles',
-            payload: {
-              txId: Date.now(),
-              files: selectedImages.map(img => ({
-                name: img.file.name,
-                type: img.file.type,
-                base64: img.base64
-              }))
-            }
-          })
+          body: JSON.stringify({ action: 'uploadFiles', payload: { txId: Date.now(), files: selectedImages.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 })) } })
         });
         const uploadData = await uploadRes.json();
-        if (uploadData.status === 'success') {
-          receiptUrls = uploadData.urls.join(", ");
-        }
-      } catch (err) {
-        console.error("Upload failed", err);
-      }
+        if (uploadData.status === 'success') receiptUrls = uploadData.urls.join(", ");
+      } catch (err) { console.error("Upload failed", err); }
     }
 
     const newTx = {
@@ -247,8 +211,7 @@ export default function App() {
       desc: formData.itemName || (modalType === 'income' ? 'รายรับ' : 'รายจ่าย'),
       amount: finalAmount, method: formData.paymentMethod,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-      category: formData.category, 
-      receiptUrl: receiptUrls
+      category: formData.category, receiptUrl: receiptUrls, business: formData.business
     };
 
     setTransactions([newTx, ...transactions]);
@@ -256,130 +219,81 @@ export default function App() {
 
     if (isOnline) {
       try {
-        await fetch(API_URL, {
-          method: 'POST', mode: 'no-cors',
-          body: JSON.stringify({ action: 'addTransaction', payload: newTx })
-        });
+        await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addTransaction', payload: newTx }) });
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 3000);
-      } catch (error) {
-        setSyncStatus('error');
-      }
+      } catch (error) { setSyncStatus('error'); }
     }
   };
 
-  const [isAddCategoryModalOpen, setIsAddCategoryModalOpen] = useState(false);
-  const [newCategoryType, setNewCategoryType] = useState('income');
-  const [newCategoryName, setNewCategoryName] = useState('');
+  const [isAddBusinessModalOpen, setIsAddBusinessModalOpen] = useState(false);
+  const [newBusiness, setNewBusiness] = useState({ name: '', icon: 'Briefcase' });
 
-  const handleAddCategory = async () => {
-    if (!newCategoryName.trim()) return;
-    const catName = newCategoryName.trim();
-    setCategories(prev => ({ ...prev, [newCategoryType]: [...prev[newCategoryType], catName] }));
-    setIsAddCategoryModalOpen(false);
-    setNewCategoryName('');
+  const handleAddBusiness = async () => {
+    if (!newBusiness.name.trim()) return;
+    const bId = newBusiness.name.trim().toLowerCase().replace(/\s+/g, '_');
+    const bObj = { id: bId, name: newBusiness.name.trim(), icon: newBusiness.icon };
+    
+    setBusinesses([...businesses, bObj]);
+    setCategories(prev => ({ ...prev, [bId]: { income: ['ทั่วไป'], expense: ['ทั่วไป'] } }));
+    setIsAddBusinessModalOpen(false);
+    setNewBusiness({ name: '', icon: 'Briefcase' });
 
     if (isOnline) {
       setSyncStatus('syncing');
       try {
-        await fetch(API_URL, {
-          method: 'POST', mode: 'no-cors',
-          body: JSON.stringify({ action: 'addCategory', payload: { type: newCategoryType, name: catName } })
-        });
+        await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addBusiness', payload: bObj }) });
         setSyncStatus('success');
-        setTimeout(() => setSyncStatus('idle'), 2000);
       } catch (e) { setSyncStatus('error'); }
     }
   };
 
-  const handleDeleteCategory = (type, cat) => {
-    if (window.confirm(`ยืนยันการลบหมวดหมู่: ${cat}?`)) {
-       setCategories(prev => ({ ...prev, [type]: prev[type].filter(c => c !== cat) }));
-    }
-  };
-
-  const handleMigration = async () => {
-    if (!window.confirm('คุณต้องการอัปโหลดข้อมูลทั้งหมดขึ้นระบบคลาวด์ (Google Sheets) ใช่หรือไม่?')) return;
-    if (!isOnline) return alert('กรุณาเชื่อมต่ออินเทอร์เน็ตก่อนทำรายการ');
-    setSyncStatus('syncing');
-    try {
-      for (const tx of transactions) {
-        await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addTransaction', payload: tx }) });
-      }
-      alert(`อัปโหลดสำเร็จจำนวน ${transactions.length} รายการ`);
-      setSyncStatus('success');
-    } catch (e) { setSyncStatus('error'); }
-  };
-
   const formatCurrency = (val) => `฿${(parseFloat(val) || 0).toLocaleString()}`;
+  const getIcon = (name) => { const Icon = ICON_MAP[name] || Briefcase; return <Icon size={18} />; };
 
   return (
     <div className="min-h-screen bg-[#F8F7FA] text-[#1D1B20] font-sans flex flex-col selection:bg-[#DDFD54] selection:text-[#1D1B20]">
       <input type="file" multiple accept="image/*" capture="environment" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
 
-      {/* Floating Navbar */}
+      {/* Navbar */}
       <nav className="px-3 md:px-8 py-3 md:py-5 w-full sticky top-0 z-50 bg-[#F8F7FA]/90 backdrop-blur-md">
         <div className="max-w-7xl mx-auto bg-white rounded-full px-4 md:px-6 py-2.5 md:py-3 flex justify-between items-center shadow-lg border border-[#EAE3F4]/50 z-50">
           <div className="flex items-center gap-3">
-            <button className="lg:hidden p-2 text-[#1D1B20]" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}>
-              {isMobileMenuOpen ? <X size={20} /> : <Menu size={20} />}
-            </button>
-            <div className="flex items-center gap-2">
-              <Sparkles className="text-[#AE88F9] hidden xs:block" size={20} />
-              <h1 className="font-black text-lg md:text-xl tracking-tighter">WTR<span className="text-[#AE88F9]">.</span></h1>
-            </div>
+            <button className="lg:hidden p-2" onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}><Menu size={20} /></button>
+            <div className="flex items-center gap-2"><Sparkles className="text-[#AE88F9] hidden xs:block" size={20} /><h1 className="font-black text-lg md:text-xl tracking-tighter">WTR<span className="text-[#AE88F9]">.</span></h1></div>
           </div>
           <div className="hidden lg:flex items-center gap-2 absolute left-1/2 -translate-x-1/2 bg-[#F8F7FA] p-1 rounded-full border border-[#EAE3F4]/50">
-            {[
-              { id: 'dashboard', label: 'ภาพรวม', icon: Home },
-              { id: 'reports', label: 'รายงาน', icon: PieChart },
-              { id: 'settings', label: 'ตั้งค่า', icon: Settings }
-            ].map(tab => (
-              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 font-black px-5 py-2.5 rounded-full transition-all ${activeTab === tab.id ? 'bg-white text-[#1D1B20] shadow-sm' : 'text-[#7A7585] hover:text-[#1D1B20]'}`}>
-                <tab.icon size={18} /> {tab.label}
-              </button>
+            {[{ id: 'dashboard', label: 'ภาพรวม', icon: Home }, { id: 'reports', label: 'รายงาน', icon: PieChart }, { id: 'settings', label: 'ตั้งค่า', icon: Settings }].map(tab => (
+              <button key={tab.id} onClick={() => setActiveTab(tab.id)} className={`flex items-center gap-2 font-black px-5 py-2.5 rounded-full transition-all ${activeTab === tab.id ? 'bg-white text-[#1D1B20] shadow-sm' : 'text-[#7A7585] hover:text-[#1D1B20]'}`}><tab.icon size={18} /> {tab.label}</button>
             ))}
           </div>
           <div className="flex items-center gap-2 md:gap-3">
-             <div className={`p-1.5 md:p-2 rounded-full flex items-center gap-2 ${syncStatus === 'syncing' ? 'bg-amber-50 text-amber-500 animate-pulse' : 'bg-green-50 text-emerald-500'}`}>
-               {isOnline ? (syncStatus === 'syncing' ? <RefreshCcw size={16} className="animate-spin" /> : <Wifi size={16} />) : <WifiOff size={16} />}
-             </div>
+             <div className={`p-1.5 md:p-2 rounded-full flex items-center gap-2 ${syncStatus === 'syncing' ? 'bg-amber-50 text-amber-500 animate-pulse' : 'bg-green-50 text-emerald-500'}`}>{isOnline ? (syncStatus === 'syncing' ? <RefreshCcw size={16} className="animate-spin" /> : <Wifi size={16} />) : <WifiOff size={16} />}</div>
              <div className="w-8 h-8 md:w-10 md:h-10 bg-[#DDFD54] rounded-full flex items-center justify-center font-black text-[10px] shadow-sm">WTR</div>
           </div>
         </div>
       </nav>
 
-      {isMobileMenuOpen && (
-        <div className="lg:hidden fixed inset-0 z-40 bg-[#1D1B20]/40 backdrop-blur-sm" onClick={() => setIsMobileMenuOpen(false)}>
-          <div className="absolute top-[80px] left-3 right-3 bg-white rounded-[32px] p-4 flex flex-col gap-2">
-            {[
-              { id: 'dashboard', label: 'หน้าแรก / ภาพรวม', icon: Home },
-              { id: 'reports', label: 'รายงานรายรับ-จ่าย', icon: PieChart },
-              { id: 'settings', label: 'ตั้งค่าข้อมูลอู่', icon: Settings }
-            ].map(tab => (
-              <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }} className={`flex items-center gap-4 font-black p-4 rounded-[24px] ${activeTab === tab.id ? 'bg-[#DDFD54]' : 'text-[#7A7585]'}`}>
-                 <tab.icon size={20} />
-                 {tab.label}
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
+      {/* Business Switcher Tab */}
+      <div className="max-w-7xl mx-auto w-full px-4 md:px-8 mt-4 overflow-x-auto no-scrollbar flex gap-2 pb-2">
+         <button onClick={() => setActiveBusinessId('all')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === 'all' ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>เครือ WTR</button>
+         {businesses.map(b => (
+           <button key={b.id} onClick={() => setActiveBusinessId(b.id)} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === b.id ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>{getIcon(b.icon)} {b.name}</button>
+         ))}
+      </div>
 
       <main className="flex-1 w-full max-w-7xl mx-auto p-4 md:p-8">
         {activeTab === 'dashboard' && (
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 md:gap-8 animate-in fade-in duration-500">
              <div className="lg:col-span-8 space-y-6 md:space-y-8">
                 <div className="pt-2 md:pt-4">
-                  <h2 className="text-3xl md:text-6xl font-black tracking-tighter text-[#1D1B20] leading-none">ระบบบัญชีอู่<br/><span className="text-[#AE88F9]">WTR Ledger.</span></h2>
-                  <p className="text-[#7A7585] font-black mt-3 md:mt-6 uppercase tracking-widest text-[9px] md:text-xs">จัดการข้อมูลรายรับ-รายจ่ายผ่านระบบคลาวด์อัตโนมัติ</p>
+                  <h2 className="text-3xl md:text-6xl font-black tracking-tighter text-[#1D1B20] leading-none">ระบบบัญชี<br/><span className="text-[#AE88F9]">{activeBusinessId === 'all' ? 'ครบวงจร WTR' : (businesses.find(b => b.id === activeBusinessId)?.name || 'อู่')}</span></h2>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 md:gap-6">
                    <div className="md:col-span-2 bg-[#AE88F9] p-6 md:p-10 rounded-[32px] md:rounded-[56px] text-white shadow-2xl relative overflow-hidden group">
-                      <p className="text-white/60 font-black text-[9px] md:text-xs uppercase tracking-widest mb-1 md:mb-2">ยอดเงินคงเหลือสุทธิ</p>
+                      <p className="text-white/60 font-black text-[9px] md:text-xs uppercase tracking-widest mb-1 md:mb-2">ยอดวงเงินคงเหลือ</p>
                       <h3 className="text-4xl md:text-7xl font-black tracking-tighter truncate">{formatCurrency(totals.balance)}</h3>
-                      <div className="absolute top-0 right-0 w-32 md:w-48 h-32 md:h-48 bg-white/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
                    </div>
                    <div className="bg-[#DDFD54] p-6 md:p-10 rounded-[32px] md:rounded-[56px] flex flex-col justify-between shadow-sm">
                       <div className="w-8 h-8 md:w-12 md:h-12 bg-white/40 rounded-full flex items-center justify-center"><ArrowUpRight size={20} /></div>
@@ -400,26 +314,18 @@ export default function App() {
              </div>
 
              <div className="lg:col-span-4 bg-white rounded-[32px] md:rounded-[56px] shadow-2xl flex flex-col h-[600px] lg:h-[750px] overflow-hidden border border-[#EAE3F4] animate-in slide-in-from-right-8 duration-700">
-                <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center">
-                   <h3 className="font-black text-lg md:text-2xl tracking-tighter uppercase">รายการล่าสุด</h3>
-                   <button onClick={() => setIsHistoryOpen(true)} className="text-[#AE88F9] font-black text-xs md:text-sm">ดูทั้งหมด</button>
-                </div>
+                <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center"><h3 className="font-black text-lg md:text-2xl tracking-tighter uppercase">รายการล่าสุด</h3><button onClick={() => setIsHistoryOpen(true)} className="text-[#AE88F9] font-black text-xs md:text-sm">ดูทั้งหมด</button></div>
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
-                   {transactions.map(tx => (
+                   {filteredTransactions.map(tx => (
                      <div key={tx.id} className="flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] md:rounded-[32px] hover:bg-[#F2EFF5] transition-all group">
                         <div className="flex items-center gap-3 md:gap-4 min-w-0">
-                           <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>
-                              {tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />)}
-                           </div>
-                           <div className="truncate">
-                              <p className="font-black text-xs md:text-[15px] truncate text-[#1D1B20] leading-none mb-1">{tx.desc}</p>
-                              <p className="text-[9px] md:text-[10px] font-black text-[#7A7585] uppercase tracking-tighter">{tx.party} • {tx.time}</p>
-                           </div>
+                           <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />)}</div>
+                           <div className="truncate"><p className="font-black text-xs md:text-[15px] truncate text-[#1D1B20] leading-none mb-1">{tx.desc}</p><p className="text-[9px] md:text-[10px] font-black text-[#7A7585] uppercase tracking-tighter">{tx.party} • {tx.business.toUpperCase()}</p></div>
                         </div>
                         <p className={`font-black text-xs md:text-base tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{formatCurrency(tx.amount)}</p>
                      </div>
                    ))}
-                   {transactions.length === 0 && <div className="h-full flex items-center justify-center text-[#7A7585] font-black opacity-30 uppercase">ยังไม่มีข้อมูล</div>}
+                   {filteredTransactions.length === 0 && <div className="h-full flex items-center justify-center text-[#7A7585] font-black opacity-30 uppercase">ยังไม่มีข้อมูล</div>}
                 </div>
              </div>
           </div>
@@ -428,47 +334,22 @@ export default function App() {
         {activeTab === 'reports' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
              <div className="flex justify-between items-end pt-4">
-               <div>
-                 <h2 className="text-3xl md:text-5xl font-black text-[#1D1B20] tracking-tighter">รายงานยอดเงิน</h2>
-                 <p className="text-[#7A7585] text-xs md:text-sm font-bold mt-2">สรุปรายการรายรับ-จ่ายตามหมวดหมู่</p>
-               </div>
-               <div className="bg-white p-1 rounded-full shadow-sm border border-[#EAE3F4] flex">
-                 {[
-                   {id: 'daily', label: 'รายวัน'},
-                   {id: 'weekly', label: 'สัปดาห์'},
-                   {id: 'monthly', label: 'เดือน'},
-                   {id: 'yearly', label: 'รายปี'}
-                 ].map(p => (
-                   <button key={p.id} onClick={() => setReportPeriod(p.id)} className={`px-3 md:px-5 py-1.5 md:py-2 font-black text-[10px] md:text-xs rounded-full transition-all ${reportPeriod === p.id ? 'bg-[#1D1B20] text-[#DDFD54]' : 'text-[#7A7585]'}`}>
-                     {p.label}
-                   </button>
-                 ))}
-               </div>
+               <div><h2 className="text-3xl md:text-5xl font-black text-[#1D1B20] tracking-tighter">รายงานยอดเงิน</h2><p className="text-[#7A7585] text-xs md:text-sm font-bold mt-2">สรุปรายการสัดส่วน {activeBusinessId === 'all' ? 'ทุกธุรกิจ' : (businesses.find(b => b.id === activeBusinessId)?.name)}</p></div>
+               <div className="bg-white p-1 rounded-full shadow-sm border border-[#EAE3F4] flex overflow-x-auto no-scrollbar">{['daily', 'weekly', 'monthly', 'yearly'].map(p => (<button key={p} onClick={() => setReportPeriod(p)} className={`px-3 md:px-5 py-1.5 md:py-2 font-black text-[10px] md:text-xs rounded-full transition-all whitespace-nowrap ${reportPeriod === p ? 'bg-[#1D1B20] text-[#DDFD54]' : 'text-[#7A7585]'}`}>{p.toUpperCase()}</button>))}</div>
              </div>
-
              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white border-2 border-[#EAE3F4] p-6 md:p-10 rounded-[32px] md:rounded-[48px] h-[350px] md:h-[450px] flex flex-col shadow-sm">
-                   <h3 className="font-black text-lg md:text-2xl mb-6 md:mb-8 flex items-center gap-2"><ArrowUpRight className="text-emerald-500" /> สัดส่วนรายรับ</h3>
-                   <div className="flex-1 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar pr-2">
-                      {breakdownData.income.items.map((it, idx) => (
-                        <div key={idx} className="space-y-2 md:space-y-3">
-                           <div className="flex justify-between font-black text-[10px] md:text-sm uppercase"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div>
-                           <div className="h-3 md:h-4 bg-[#F8F7FA] rounded-full overflow-hidden border border-[#EAE3F4]/50"><div className="h-full bg-[#DDFD54] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div>
-                        </div>
-                      ))}
-                      {breakdownData.income.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30">ยังไม่มีข้อมูลรายรับ</p>}
+                <div className="bg-white border-2 border-[#EAE3F4] p-6 md:p-10 rounded-[32px] md:rounded-[48px] h-[400px] flex flex-col shadow-sm">
+                   <h3 className="font-black text-lg md:text-2xl mb-6 flex items-center gap-2"><ArrowUpRight className="text-emerald-500" /> สัดส่วนรายรับ</h3>
+                   <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
+                      {breakdownData.income.items.map((it, idx) => (<div key={idx} className="space-y-2"><div className="flex justify-between font-black text-[10px] md:text-sm uppercase"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div><div className="h-3 bg-[#F8F7FA] rounded-full overflow-hidden"><div className="h-full bg-[#DDFD54] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div></div>))}
+                      {breakdownData.income.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30 uppercase">No Data</p>}
                    </div>
                 </div>
-                <div className="bg-white border-2 border-[#EAE3F4] p-6 md:p-10 rounded-[32px] md:rounded-[48px] h-[350px] md:h-[450px] flex flex-col shadow-sm">
-                   <h3 className="font-black text-lg md:text-2xl mb-6 md:mb-8 flex items-center gap-2"><ArrowDownRight className="text-[#AE88F9]" /> สัดส่วนรายจ่าย</h3>
-                   <div className="flex-1 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar pr-2">
-                       {breakdownData.expense.items.map((it, idx) => (
-                        <div key={idx} className="space-y-2 md:space-y-3">
-                           <div className="flex justify-between font-black text-[10px] md:text-sm uppercase"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div>
-                           <div className="h-3 md:h-4 bg-[#F8F7FA] rounded-full overflow-hidden border border-[#EAE3F4]/50"><div className="h-full bg-[#AE88F9] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div>
-                        </div>
-                      ))}
-                      {breakdownData.expense.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30">ยังไม่มีข้อมูลรายจ่าย</p>}
+                <div className="bg-white border-2 border-[#EAE3F4] p-6 md:p-10 rounded-[32px] md:rounded-[48px] h-[400px] flex flex-col shadow-sm">
+                   <h3 className="font-black text-lg md:text-2xl mb-6 flex items-center gap-2"><ArrowDownRight className="text-[#AE88F9]" /> สัดส่วนรายจ่าย</h3>
+                   <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
+                       {breakdownData.expense.items.map((it, idx) => (<div key={idx} className="space-y-2"><div className="flex justify-between font-black text-[10px] md:text-sm uppercase"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div><div className="h-3 bg-[#F8F7FA] rounded-full overflow-hidden"><div className="h-full bg-[#AE88F9] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div></div>))}
+                       {breakdownData.expense.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30 uppercase">No Data</p>}
                    </div>
                 </div>
              </div>
@@ -476,55 +357,28 @@ export default function App() {
         )}
 
         {activeTab === 'settings' && (
-          <div className="max-w-4xl mx-auto space-y-6 md:space-y-8 animate-in fade-in duration-500">
-             <div className="text-center pt-4 md:pt-8 px-4">
-               <h2 className="text-2xl md:text-4xl font-black tracking-tighter">จัดการระบบอู่</h2>
-               <p className="text-[#7A7585] font-bold mt-2 text-xs md:text-sm">จัดการหมวดหมู่และการเชื่อมต่อข้อมูล Cloud</p>
+          <div className="max-w-4xl mx-auto space-y-8 animate-in fade-in duration-500">
+             <div className="flex justify-between items-center bg-white p-8 rounded-[48px] shadow-sm border-2 border-[#EAE3F4]">
+                <h2 className="text-3xl font-black tracking-tighter">จัดการธุรกิจ (Businesses)</h2>
+                <button onClick={() => setIsAddBusinessModalOpen(true)} className="bg-[#1D1B20] text-[#DDFD54] px-6 py-3 rounded-2xl font-black text-sm transition-transform active:scale-95 flex items-center gap-2"><Plus size={18}/> เพิ่มธุรกิจใหม่</button>
              </div>
 
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
-                <div className="bg-[#1D1B20] p-8 md:p-10 rounded-[32px] md:rounded-[48px] text-white shadow-2xl relative overflow-hidden">
-                   <h3 className="font-black text-lg md:text-xl mb-6 relative z-10 uppercase">Cloud Connection</h3>
-                   <div className="space-y-4 relative z-10">
-                      <div className="bg-white/10 p-4 rounded-3xl border border-white/10">
-                        <p className="text-[9px] font-black text-[#DDFD54] mb-1 uppercase">Google Sheets API URL</p>
-                        <p className="text-[10px] truncate opacity-60 font-mono italic">{API_URL}</p>
-                      </div>
-                      <button onClick={syncWithGoogleSheets} className="w-full bg-[#DDFD54] text-[#1D1B20] py-3 md:py-4 rounded-2xl md:rounded-3xl font-black text-xs md:text-sm hover:scale-[1.02] transition-transform">ดึงข้อมูลจาก Cloud เดี๋ยวนี้</button>
-                      <button onClick={handleMigration} className="w-full bg-white/10 text-white py-3 md:py-4 rounded-2xl md:rounded-3xl font-black text-xs md:text-sm border border-white/20 hover:bg-white/20">อัปโหลดข้อมูลในเครื่องขึ้น Cloud</button>
-                   </div>
-                   <div className="absolute top-0 right-0 w-32 h-32 bg-[#AE88F9]/30 rounded-full blur-3xl -mr-16 -mt-16"></div>
-                </div>
-
-                <div className="bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm">
-                   <h3 className="font-black text-lg md:text-xl mb-6">จัดการหน่วยความจำ</h3>
-                   <div className="space-y-4">
-                      <p className="text-[10px] text-[#7A7585] font-medium leading-relaxed">การล้างข้อมูลจะลบเฉพาะข้อมูลที่พักไว้ในเบราว์เซอร์เท่านั้น ข้อมูลบน Google Sheets ของคุณจะยังคงปลอดภัย ไม่หายไปไหนครับ</p>
-                      <button onClick={() => {if(window.confirm('คุณต้องการล้าง Cache ในเครื่องใช่หรือไม่?')) { localStorage.clear(); window.location.reload(); }}} className="w-full bg-rose-50 text-rose-500 py-3 md:py-4 rounded-2xl md:rounded-3xl font-black text-xs md:text-sm border border-rose-100 hover:bg-rose-100">ล้างข้อมูลในเครื่อง (Clear Cache)</button>
-                   </div>
-                </div>
-             </div>
-
-             <div className="bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm">
-                <div className="mb-8">
-                  <h3 className="font-black text-xl md:text-2xl tracking-tighter uppercase">จัดการหมวดหมู่รายการ</h3>
-                </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-10">
-                   <div>
-                      <h4 className="font-black text-emerald-500 text-[10px] md:text-xs mb-4 tracking-widest uppercase flex items-center gap-2"><ArrowUpRight size={18} /> หมวดหมู่รายรับ</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {categories.income.map(c => <div key={c} className="bg-[#F8F7FA] px-3 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-2xl text-[9px] md:text-xs font-black flex items-center gap-2 border border-[#EAE3F4]">{c}<button onClick={() => handleDeleteCategory('income', c)} className="text-rose-400 hover:text-rose-600"><X size={14} /></button></div>)}
-                        <button onClick={() => {setNewCategoryType('income'); setIsAddCategoryModalOpen(true);}} className="bg-[#DDFD54] px-3 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-2xl text-[9px] md:text-xs font-black">+ เพิ่ม</button>
-                      </div>
-                   </div>
-                   <div>
-                      <h4 className="font-black text-[#AE88F9] text-[10px] md:text-xs mb-4 tracking-widest uppercase flex items-center gap-2"><ArrowDownRight size={18} /> หมวดหมู่รายจ่าย</h4>
-                      <div className="flex flex-wrap gap-2">
-                        {categories.expense.map(c => <div key={c} className="bg-[#F8F7FA] px-3 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-2xl text-[9px] md:text-xs font-black flex items-center gap-2 border border-[#EAE3F4]">{c}<button onClick={() => handleDeleteCategory('expense', c)} className="text-rose-400 hover:text-rose-600"><X size={14} /></button></div>)}
-                        <button onClick={() => {setNewCategoryType('expense'); setIsAddCategoryModalOpen(true);}} className="bg-[#AE88F9] text-white px-3 md:px-4 py-1.5 md:py-2 rounded-xl md:rounded-2xl text-[9px] md:text-xs font-black">+ เพิ่ม</button>
-                      </div>
-                   </div>
-                </div>
+             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {businesses.map(b => (
+                  <div key={b.id} className="bg-white p-8 rounded-[40px] shadow-md border-2 border-[#EAE3F4] relative group transition-all hover:border-[#1D1B20]">
+                     <div className="flex items-center gap-4 mb-6">
+                        <div className="w-14 h-14 bg-[#DDFD54] rounded-2xl flex items-center justify-center shadow-lg">{getIcon(b.icon)}</div>
+                        <h4 className="font-black text-2xl tracking-tighter">{b.name}</h4>
+                     </div>
+                     <div className="space-y-4">
+                        <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
+                        <div className="flex flex-wrap gap-2">
+                           {categories[b.id]?.income.concat(categories[b.id]?.expense).slice(0, 4).map(c => <span key={c} className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black">{c}</span>)}
+                           <span className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black opacity-40">...</span>
+                        </div>
+                     </div>
+                  </div>
+                ))}
              </div>
           </div>
         )}
@@ -539,99 +393,89 @@ export default function App() {
                  <button onClick={() => setIsModalOpen(false)} className="bg-white/20 p-2 md:p-4 rounded-full active:rotate-90 transition-transform"><X size={20} /></button>
               </div>
               <form onSubmit={handleFormSubmit} className="p-6 md:p-12 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar">
+                 <div className="space-y-1.5 md:space-y-2">
+                    <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">เลือกธุรกิจที่เป็นเจ้าของรายการ</label>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                       {businesses.map(b => (
+                          <button key={b.id} type="button" onClick={() => setFormData({...formData, business: b.id})} className={`p-4 rounded-2xl border-2 font-black text-xs transition-all flex flex-col items-center gap-1 ${formData.business === b.id ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-md' : 'bg-white border-[#EAE3F4] text-[#7A7585]'}`}>
+                             {getIcon(b.icon)} <span>{b.name}</span>
+                          </button>
+                       ))}
+                    </div>
+                 </div>
+
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                     <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm" /></div>
-                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">หมวดหมู่</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm appearance-none">{categories[modalType].map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">หมวดหมู่ ({formData.business})</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm appearance-none">{(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                  </div>
-                 <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">{modalType === 'income' ? 'รับเงินจาก (ลูกค้า/บริษัท)' : 'จ่ายเงินให้ (ร้านค้า/ผู้ขาย)'}</label>
-                 <input type="text" placeholder="ระบุชื่อ..." value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-xs md:text-sm focus:border-black border-2 border-transparent transition" /></div>
                  
-                 <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">รายละเอียดรายการ</label>
-                 <input type="text" placeholder="พิมพ์ชื่อรายการหรือสินค้า..." value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-xs md:text-sm focus:border-black border-2 border-transparent transition" /></div>
+                 <input type="text" placeholder={modalType === 'income' ? 'รับจากลูกค้า...' : 'จ่ายให้ร้านค้า...'} value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-xs md:text-sm focus:border-black border-2 border-transparent transition" />
+                 <input type="text" placeholder="พิมพ์ชื่อรายการ..." value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-xs md:text-sm focus:border-black border-2 border-transparent transition" />
                  
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">ราคาต่อหน่วย</label><input type="number" placeholder="0.00" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-3xl outline-none font-black text-xs md:text-sm" /></div>
-                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">จำนวน</label><input type="number" placeholder="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-3xl outline-none font-black text-xs md:text-sm" /></div>
+                 <div className="grid grid-cols-2 gap-3">
+                    <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'cash'})} className={`py-4 rounded-2xl font-black text-xs border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'cash' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><Wallet size={16} /> เงินสด</button>
+                    <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'transfer'})} className={`py-4 rounded-2xl font-black text-xs border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'transfer' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><ArrowRightLeft size={16} /> เงินโอน</button>
                  </div>
 
-                 <div className="space-y-1.5 md:space-y-2">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">ช่องทางการชำระเงิน</label>
-                    <div className="grid grid-cols-2 gap-3">
-                       <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'cash'})} className={`py-4 rounded-2xl font-black text-xs md:text-sm border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'cash' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-lg scale-[1.02]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><Wallet size={16} /> เงินสด</button>
-                       <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'transfer'})} className={`py-4 rounded-2xl font-black text-xs md:text-sm border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'transfer' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-lg scale-[1.02]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><ArrowRightLeft size={16} /> เงินโอน</button>
-                    </div>
+                 <div className="grid grid-cols-2 gap-4">
+                    <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">ราคา</label><input type="number" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-sm" /></div>
+                    <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">จำนวน</label><input type="number" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-sm" /></div>
                  </div>
-                 
-                 <div className="space-y-3">
-                    <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">แนบรูปภาพ (ใบเสร็จ/สลิป)</label>
+
+                 <div className="space-y-2">
+                    <label className="text-[9px] font-black uppercase opacity-40 ml-1">แนบรูปใบเสร็จ</label>
                     <div className="flex flex-wrap gap-2">
-                       {selectedImages.map(img => (
-                          <div key={img.id} className="relative w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl overflow-hidden shadow-md group">
-                             <img src={img.preview} alt="Receipt" className="w-full h-full object-cover" />
-                             <button type="button" onClick={() => removeImage(img.id)} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-rose-500 shadow-sm opacity-100 md:opacity-0 group-hover:opacity-100 transition-opacity">
-                                <X size={12} />
-                             </button>
-                          </div>
-                       ))}
-                       <button type="button" onClick={() => fileInputRef.current?.click()} className="w-16 h-16 md:w-20 md:h-20 rounded-xl md:rounded-2xl border-2 border-dashed border-[#EAE3F4] flex flex-col items-center justify-center text-[#7A7585] hover:bg-[#F8F7FA] transition active:scale-95">
-                          <Camera size={20} />
-                          <span className="text-[8px] md:text-[9px] font-black mt-1">เพิ่มรูป</span>
-                       </button>
+                       {selectedImages.map(img => (<div key={img.id} className="relative w-16 h-16 rounded-xl overflow-hidden shadow-md group"><img src={img.preview} className="w-full h-full object-cover" /><button type="button" onClick={() => setSelectedImages(selectedImages.filter(i => i.id !== img.id))} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-rose-500"><X size={12} /></button></div>))}
+                       <button type="button" onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-xl border-2 border-dashed border-[#EAE3F4] flex flex-col items-center justify-center text-[#7A7585] hover:bg-[#F8F7FA] transition active:scale-95"><Camera size={20} /><span className="text-[8px] font-black mt-1">เพิ่มรูป</span></button>
                     </div>
                  </div>
 
-                 <div className="p-6 md:p-8 bg-[#1D1B20] text-center rounded-[24px] md:rounded-[32px] shadow-2xl">
-                    <p className="text-[9px] md:text-[10px] font-black text-white/50 mb-1 uppercase tracking-widest">ยอดชำระเงินรวม</p>
-                    <h3 className="text-2xl md:text-4xl font-black text-[#DDFD54]">{formatCurrency((parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0)}</h3>
+                 <div className="p-6 bg-[#1D1B20] text-center rounded-[24px]">
+                    <p className="text-[9px] font-black text-white/50 mb-1 uppercase tracking-widest">ยอดรวมสุทธิ</p>
+                    <h3 className="text-2xl font-black text-[#DDFD54]">{formatCurrency((parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0)}</h3>
                  </div>
-                 <button type="submit" disabled={syncStatus === 'syncing'} className={`w-full py-5 md:py-8 rounded-full text-lg md:text-xl font-black transition-all shadow-2xl active:scale-[0.98] flex items-center justify-center gap-3 ${modalType === 'income' ? 'bg-[#DDFD54] text-[#1D1B20]' : 'bg-[#AE88F9] text-white'}`}>
-                    {syncStatus === 'syncing' ? <RefreshCcw className="animate-spin" /> : <CloudUpload />} {syncStatus === 'syncing' ? 'กำลังบันทึกข้อมูล...' : 'ยืนยันการบันทึกรายการ'}
-                 </button>
+                 <button type="submit" disabled={syncStatus === 'syncing'} className={`w-full py-5 rounded-full text-lg font-black transition-all shadow-2xl flex items-center justify-center gap-3 ${modalType === 'income' ? 'bg-[#DDFD54] text-[#1D1B20]' : 'bg-[#AE88F9] text-white'}`}>{syncStatus === 'syncing' ? <RefreshCcw className="animate-spin" /> : <CloudUpload />} {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 'ยืนยันการบันทึกรายการ'}</button>
               </form>
            </div>
         </div>
       )}
 
-      {/* Categories Add Modal */}
-      {isAddCategoryModalOpen && (
+      {/* Add Business Modal */}
+      {isAddBusinessModalOpen && (
         <div className="fixed inset-0 z-[120] flex items-center justify-center p-4 bg-[#1D1B20]/40 backdrop-blur-md">
            <div className="bg-white p-8 md:p-10 rounded-[32px] md:rounded-[48px] w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
-              <h3 className="text-xl md:text-2xl font-black mb-6 uppercase tracking-tighter">เพิ่มหมวดหมู่{newCategoryType === 'income' ? 'รายรับ' : 'รายจ่าย'}</h3>
-              <input type="text" autoFocus value={newCategoryName} onChange={e => setNewCategoryName(e.target.value)} onKeyDown={e => e.key === 'Enter' && handleAddCategory()} placeholder="กรอกชื่อหมวดหมู่..." className="w-full bg-[#F8F7FA] p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm mb-6" />
-              <button onClick={handleAddCategory} className="w-full bg-[#1D1B20] text-white py-4 rounded-2xl font-black tracking-widest">เพิ่มข้อมูล</button>
-              <button onClick={() => setIsAddCategoryModalOpen(false)} className="w-full mt-4 text-[#7A7585] font-black text-sm">ยกเลิก</button>
+              <h3 className="text-xl md:text-2xl font-black mb-6 uppercase tracking-tighter">เพิ่มธุรกิจใหม่</h3>
+              <div className="space-y-6">
+                <input type="text" autoFocus value={newBusiness.name} onChange={e => setNewBusiness({...newBusiness, name: e.target.value})} placeholder="ชื่อธุรกิจ (เช่น สวน, ร้านค้า)..." className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-sm" />
+                <div className="grid grid-cols-3 gap-3">
+                   {['Wrench', 'Leaf', 'ShoppingCart', 'Tractor', 'Factory', 'Briefcase'].map(icon => (
+                      <button key={icon} onClick={() => setNewBusiness({...newBusiness, icon: icon})} className={`p-4 rounded-xl border-2 flex items-center justify-center transition-all ${newBusiness.icon === icon ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white border-[#EAE3F4] text-[#7A7585]'}`}>{getIcon(icon)}</button>
+                   ))}
+                </div>
+                <button onClick={handleAddBusiness} className="w-full bg-[#1D1B20] text-white py-4 rounded-2xl font-black tracking-widest shadow-lg">ยืนยันการเพิ่มธุรกิจ</button>
+                <button onClick={() => setIsAddBusinessModalOpen(false)} className="w-full mt-2 text-[#7A7585] font-black text-sm">ยกเลิก</button>
+              </div>
            </div>
         </div>
       )}
 
-      {/* History Window */}
       {isHistoryOpen && (
         <div className="fixed inset-0 z-[150] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
            <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-20">
-              <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase">สมุดบัญชีทั้งหมด</h2>
-              <button onClick={() => setIsHistoryOpen(false)} className="bg-[#F8F7FA] p-3 md:p-4 rounded-full text-[#1D1B20] hover:scale-110 shadow-sm transition-transform"><X size={24} /></button>
+              <h2 className="text-2xl md:text-4xl font-black tracking-tighter uppercase">สมุดบัญชี ({activeBusinessId === 'all' ? 'รวม' : activeBusinessId})</h2>
+              <button onClick={() => setIsHistoryOpen(false)} className="bg-[#F8F7FA] p-3 md:p-4 rounded-full text-[#1D1B20] shadow-sm"><X size={24} /></button>
            </div>
            <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-3">
               <div className="max-w-4xl mx-auto space-y-3">
-                 {transactions.map(tx => (
-                    <div key={tx.id} className="flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[24px] md:rounded-[32px] hover:scale-[1.01] transition-transform shadow-sm">
+                 {filteredTransactions.map(tx => (
+                    <div key={tx.id} className="flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[32px] shadow-sm">
                        <div className="flex items-center gap-4 md:gap-6 min-w-0">
-                          <div className={`w-10 h-10 md:w-14 md:h-14 rounded-xl md:rounded-2xl flex items-center justify-center font-black shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>
-                             {tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={20}/> : <ArrowDownRight size={20}/>)}
-                          </div>
-                          <div className="truncate">
-                            <p className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</p>
-                            <p className="text-[9px] md:text-xs uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.party}</p>
-                          </div>
+                          <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-black shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={20}/> : <ArrowDownRight size={20}/>)}</div>
+                          <div className="truncate"><p className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</p><p className="text-[10px] uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.business} • {tx.party}</p></div>
                        </div>
-                       <div className="text-right ml-4">
-                          <p className={`text-sm md:text-2xl font-black tracking-tighter ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>
-                             {tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}
-                          </p>
-                       </div>
+                       <div className="text-right ml-4"><p className={`text-sm md:text-2xl font-black tracking-tighter ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>{tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}</p></div>
                     </div>
                   ))}
-                 {transactions.length === 0 && <p className="text-center py-20 font-black opacity-20">ยังไม่มีรายการบันทึกในประวัติ</p>}
               </div>
            </div>
         </div>

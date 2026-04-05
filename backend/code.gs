@@ -1,14 +1,15 @@
 /**
  * WTR Ledger Backend (Google Apps Script)
  * 
- * Version: 2.0 (Supports Multiple Image Uploads to Drive)
+ * Version: 3.0 (Supports Multi-Business & Image Uploads)
  */
 
 function doGet(e) {
   const action = e.parameter.action;
   if (action === 'getTransactions') return getJsonData('Transactions');
   if (action === 'getCategories') return getJsonData('Categories');
-  return ContentService.createTextOutput("WTR Ledger API v2.0 - Active").setMimeType(ContentService.MimeType.TEXT);
+  if (action === 'getBusinesses') return getJsonData('Businesses');
+  return ContentService.createTextOutput("WTR Ledger API v3.0 - Multi-Business Enabled").setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
@@ -25,6 +26,8 @@ function doPost(e) {
     return addTransaction(data.payload);
   } else if (action === 'addCategory') {
     return addCategory(data.payload);
+  } else if (action === 'addBusiness') {
+    return addBusiness(data.payload);
   } else if (action === 'uploadFiles') {
     return uploadFiles(data.payload);
   }
@@ -34,8 +37,15 @@ function doPost(e) {
 
 function getJsonData(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName(sheetName);
-  if (!sheet) return createResponse({status: 'error', message: 'Sheet not found'});
+  let sheet = ss.getSheetByName(sheetName);
+  
+  // Auto-create sheets if they don't exist
+  if (!sheet) {
+    sheet = ss.insertSheet(sheetName);
+    if (sheetName === 'Transactions') sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'receiptUrl', 'business']);
+    if (sheetName === 'Categories') sheet.appendRow(['businessId', 'type', 'name']);
+    if (sheetName === 'Businesses') sheet.appendRow(['id', 'name', 'icon']);
+  }
   
   const data = sheet.getDataRange().getValues();
   if (data.length <= 1) return createResponse([]);
@@ -47,11 +57,17 @@ function getJsonData(sheetName) {
     headers.forEach((h, i) => obj[h] = row[i]);
     return obj;
   });
-  return createResponse(result.reverse()); // Newest first
+  return createResponse(result.reverse());
 }
 
 function addTransaction(payload) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Transactions');
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Transactions');
+  if (!sheet) {
+    sheet = ss.insertSheet('Transactions');
+    sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'receiptUrl', 'business']);
+  }
+  
   const headers = sheet.getDataRange().getValues()[0];
   const newRow = headers.map(h => payload[h] || "");
   sheet.appendRow(newRow);
@@ -59,14 +75,27 @@ function addTransaction(payload) {
 }
 
 function addCategory(payload) {
-  const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName('Categories');
-  sheet.appendRow([payload.type, payload.name]);
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Categories');
+  if (!sheet) {
+    sheet = ss.insertSheet('Categories');
+    sheet.appendRow(['businessId', 'type', 'name']);
+  }
+  sheet.appendRow([payload.businessId, payload.type, payload.name]);
   return createResponse({ status: 'success' });
 }
 
-/**
- * Handle Multiple Base64 File Uploads to Drive
- */
+function addBusiness(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Businesses');
+  if (!sheet) {
+    sheet = ss.insertSheet('Businesses');
+    sheet.appendRow(['id', 'name', 'icon']);
+  }
+  sheet.appendRow([payload.id, payload.name, payload.icon || "Briefcase"]);
+  return createResponse({ status: 'success' });
+}
+
 function uploadFiles(payload) {
   const folderName = "WTR_Receipts";
   let folder;
