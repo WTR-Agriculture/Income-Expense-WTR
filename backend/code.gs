@@ -117,7 +117,7 @@ function addBusiness(payload) {
 
 function uploadFiles(payload) {
   // ใส่ Folder ID ที่แน่นอนที่พี่สาวสร้างไว้ เพื่อความชัวร์ (จากรูปของพี่สาว)
-  const FOLDER_ID = "17K8ZLYzlQx9vFZFQSWy5u1YeOlnwpzW"; 
+  const FOLDER_ID = "17K8ZYLzylQx9vFZFQSWy5u1YeOlnwpzW"; 
   let folder;
   
   try {
