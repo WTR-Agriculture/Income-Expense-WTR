@@ -372,50 +372,53 @@ export default function App() {
 
     // ——— อัปโหลดรูปในพื้นหลัง (Background Upload) ———
     const uploadInBackground = async (tx) => {
+      // บันทึกข้อมูลลงชีทก่อน (ยังไม่มีรูป)
+      await submitToSheet(tx);
+
       if (!isOnline || imagesToUpload.length === 0) {
-        await submitToSheet(tx);
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 2000);
         return;
       }
 
-      // บันทึกข้อมูลลงชีทก่อน (ยังไม่มีรูป)
-      await submitToSheet(tx);
-
-      // ส่งรูปขึ้น Drive
+      // ส่งรูปขึ้น Drive แบบ no-cors (fire-and-forget)
+      // เหตุผล: Google Apps Script redirect response ผ่าน echo URL ที่ไม่มี CORS header
+      // แต่ server ยังทำงานได้ปกติ รูปจะถูก upload อยู่ดี
       try {
-        const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 30000);
-
-        const uploadRes = await fetch(API_URL, {
+        await fetch(API_URL, {
           method: 'POST',
-          signal: controller.signal,
+          mode: 'no-cors',
           body: JSON.stringify({
             action: 'uploadFiles',
             payload: {
               txId: tx.id,
               files: imagesToUpload.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 }))
             }
-          }),
-          redirect: 'follow'
+          })
         });
-        clearTimeout(timeoutId);
-
-        const uploadData = await uploadRes.json();
-        if (uploadData.status === 'success' && uploadData.urls?.length > 0) {
-          const receiptUrls = uploadData.urls.join(", ");
-          const updatedTx = { ...tx, receiptUrl: receiptUrls };
-          // อัปเดต state ใน app
-          setTransactions(prev => prev.map(t => t.id === tx.id ? updatedTx : t));
-          // อัปเดตชีทด้วย
-          await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateTransaction', payload: updatedTx }), redirect: 'follow' });
-        }
       } catch (err) {
-        if (err.name !== 'AbortError') console.error("Background upload failed:", err);
+        console.warn("Upload request sent (no-cors):", err.message);
       }
 
-      setSyncStatus('success');
-      setTimeout(() => setSyncStatus('idle'), 2000);
+      // รอ 8 วินาที แล้ว Sync กลับจาก Sheet เพื่อดึง receiptUrl ที่ Server บันทึกไว้
+      setTimeout(async () => {
+        try {
+          const res = await fetch(`${API_URL}?action=getTransactions`, { redirect: 'follow' });
+          const data = await res.json();
+          if (Array.isArray(data)) {
+            const serverTx = data.find(t => t.id?.toString() === tx.id?.toString());
+            if (serverTx?.receiptUrl) {
+              setTransactions(prev => prev.map(t =>
+                t.id?.toString() === tx.id?.toString()
+                  ? { ...t, receiptUrl: serverTx.receiptUrl }
+                  : t
+              ));
+            }
+          }
+        } catch (e) { console.warn("Post-upload sync failed:", e); }
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('idle'), 2000);
+      }, 8000);
     };
 
     const submitTransaction = async (finalPartyName) => {
