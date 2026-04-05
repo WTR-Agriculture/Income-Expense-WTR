@@ -73,6 +73,7 @@ export default function App() {
   const [isNewPartyPromptOpen, setIsNewPartyPromptOpen] = useState(false);
   const [tempNewPartyName, setTempNewPartyName] = useState('');
   const [tempReceiptUrls, setTempReceiptUrls] = useState('');
+  const [newPartyInput, setNewPartyInput] = useState({ name: '', type: 'customer' });
 
   // Detail View State
   const [selectedDetailTx, setSelectedDetailTx] = useState(null);
@@ -269,16 +270,23 @@ export default function App() {
   }, [parties, transactions]);
 
   const handleAddParty = async (partyObj) => {
-    const newP = { id: Date.now(), name: partyObj.name, type: partyObj.type || 'customer', note: partyObj.note || '' };
-    setParties([...parties, newP]);
-    setIsAddPartyModalOpen(false);
-    if (isOnline) {
-      setSyncStatus('syncing');
-      try {
-        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addParty', payload: newP }), redirect: 'follow' });
-        setSyncStatus('success');
-      } catch (e) { setSyncStatus('error'); }
+    // เช็คชื่อซ้ำ (case-insensitive)
+    const isDuplicate = parties.some(
+      p => p.name.trim().toLowerCase() === partyObj.name.trim().toLowerCase()
+    );
+    if (isDuplicate) {
+      alert(`"ชื่อนี้มีอยู่แล้วค่ะ: ${partyObj.name}`);
+      return false; // บอกว่าไม่ได้เพิ่ม
     }
+    const newP = { id: Date.now(), name: partyObj.name, type: partyObj.type || 'customer', note: partyObj.note || '' };
+    setParties(prev => [...prev, newP]);
+    setIsAddPartyModalOpen(false);
+    setSyncStatus('syncing');
+    try {
+      await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addParty', payload: newP }), redirect: 'follow' });
+      setSyncStatus('success');
+    } catch (e) { setSyncStatus('error'); }
+    return true;
   };
 
   const handleDeleteParty = async (id) => {
@@ -296,7 +304,7 @@ export default function App() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '', itemName: '', unitPrice: '', quantity: '1',
-    category: '', paymentMethod: 'cash', business: 'garage',
+    category: '', paymentMethod: 'cash', business: '',
     refjob: ''
   });
 
@@ -305,7 +313,7 @@ export default function App() {
     setIsEditMode(false);
     setEditingTxId(null);
     setSelectedImages([]);
-    const defaultBusiness = activeBusinessId === 'all' ? 'garage' : activeBusinessId;
+    const defaultBusiness = activeBusinessId === 'all' ? '' : activeBusinessId;
     setFormData({
       date: new Date().toISOString().split('T')[0], partyName: '', itemName: '', unitPrice: '', quantity: '1',
       category: (categories[defaultBusiness] && categories[defaultBusiness][type][0]) || '',
@@ -360,6 +368,11 @@ export default function App() {
     if (e) e.preventDefault();
     const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
     if (finalAmount <= 0) return;
+    // บังคับเลือกธุรกิจเมื่ออยู่ในโหมดเครือ WTR
+    if (activeBusinessId === 'all' && !formData.business) {
+      alert('กรุณาเลือกธุรกิจก่อนบันทึกรายการค่ะ');
+      return;
+    }
 
     // สร้าง transaction ทันทีโดยไม่รอรูป
     const txId = isEditMode ? editingTxId : Date.now();
@@ -488,7 +501,13 @@ export default function App() {
 
   const handleConfirmNewPartySave = async (shouldSave) => {
     if (shouldSave) {
-      await handleAddParty({ name: tempNewPartyName, type: modalType === 'income' ? 'customer' : 'supplier' });
+      // เช็คก่อนว่ายังไม่มีชื่อนี้ในระบบ (กัน edge case)
+      const alreadyExists = parties.some(
+        p => p.name.trim().toLowerCase() === tempNewPartyName.trim().toLowerCase()
+      );
+      if (!alreadyExists) {
+        await handleAddParty({ name: tempNewPartyName, type: modalType === 'income' ? 'customer' : 'supplier' });
+      }
     }
     await finalizeSubmissionWithParty(tempNewPartyName);
   };
@@ -1081,28 +1100,62 @@ export default function App() {
         </div>
       )}
 
-      {/* Add/Edit Party Modal */}
-      {isAddPartyModalOpen && (
-        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
-          <div className="bg-white p-10 md:p-14 rounded-[48px] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
-            <h3 className="text-3xl font-black mb-8 leading-none uppercase tracking-tighter">Add regular contact</h3>
-            <div className="space-y-6">
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase opacity-40 ml-1">ชื่อลูกค้า หรือ ร้านค้า/คู่ค้า</label>
-                <input type="text" autoFocus id="party-name-input" placeholder="พิมพ์ชื่อที่นี่..." className="w-full bg-[#F8F7FA] p-6 rounded-3xl outline-none font-black text-lg border-2 border-transparent focus:border-[#AE88F9] transition" />
-              </div>
-              <div className="space-y-2">
-                <label className="text-[10px] font-black uppercase opacity-40 ml-1">เลือกประเภทข้อมูล</label>
-                <div className="grid grid-cols-2 gap-3">
-                  <button onClick={() => { const name = document.getElementById('party-name-input').value; if (name) handleAddParty({ name, type: 'customer' }); }} className="py-5 bg-emerald-50 text-emerald-600 rounded-3xl font-black text-sm hover:scale-[1.02] shadow-sm">ลูกค้า</button>
-                  <button onClick={() => { const name = document.getElementById('party-name-input').value; if (name) handleAddParty({ name, type: 'supplier' }); }} className="py-5 bg-[#AE88F9]/10 text-[#AE88F9] rounded-3xl font-black text-sm hover:scale-[1.02] shadow-sm">ร้านค้า</button>
+      {isAddPartyModalOpen && (() => {
+        const isDupName = newPartyInput.name.trim() !== '' &&
+          parties.some(p => p.name.trim().toLowerCase() === newPartyInput.name.trim().toLowerCase());
+        return (
+          <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="bg-white p-10 md:p-14 rounded-[48px] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+              <h3 className="text-3xl font-black mb-8 leading-none uppercase tracking-tighter">Add regular contact</h3>
+              <div className="space-y-6">
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase opacity-40 ml-1">ชื่อลูกค้า หรือ ร้านค้า/คู่ค้า</label>
+                  <input
+                    type="text" autoFocus
+                    placeholder="พิมพ์ชื่อที่นี่..."
+                    value={newPartyInput.name}
+                    onChange={e => setNewPartyInput(prev => ({ ...prev, name: e.target.value }))}
+                    className={`w-full bg-[#F8F7FA] p-6 rounded-3xl outline-none font-black text-lg border-2 transition ${
+                      isDupName ? 'border-red-400 bg-red-50' : 'border-transparent focus:border-[#AE88F9]'
+                    }`}
+                  />
+                  {isDupName && (
+                    <p className="text-red-500 text-xs font-black ml-2 animate-pulse">
+                      ⚠️ ชื่อนี้มีอยู่ในระบบแล้วค่ะ
+                    </p>
+                  )}
                 </div>
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black uppercase opacity-40 ml-1">เลือกประเภทข้อมูล</label>
+                  <div className="grid grid-cols-2 gap-3">
+                    <button
+                      disabled={isDupName || !newPartyInput.name.trim()}
+                      onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'customer' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
+                      className={`py-5 rounded-3xl font-black text-sm transition ${
+                        isDupName || !newPartyInput.name.trim()
+                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                          : 'bg-emerald-50 text-emerald-600 hover:scale-[1.02] shadow-sm'
+                      }`}>
+                      ลูกค้า
+                    </button>
+                    <button
+                      disabled={isDupName || !newPartyInput.name.trim()}
+                      onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'supplier' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
+                      className={`py-5 rounded-3xl font-black text-sm transition ${
+                        isDupName || !newPartyInput.name.trim()
+                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                          : 'bg-[#AE88F9]/10 text-[#AE88F9] hover:scale-[1.02] shadow-sm'
+                      }`}>
+                      ร้านค้า
+                    </button>
+                  </div>
+                </div>
+                <button onClick={() => { setIsAddPartyModalOpen(false); setNewPartyInput({ name: '', type: 'customer' }); }} className="w-full py-4 text-gray-400 font-black text-xs uppercase tracking-widest">Cancel</button>
               </div>
-              <button onClick={() => setIsAddPartyModalOpen(false)} className="w-full py-4 text-gray-400 font-black text-xs uppercase tracking-widest">Cancel</button>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
 
       {/* Breakdown Detailed Modal */}
       {isBreakdownOpen && (
@@ -1149,10 +1202,15 @@ export default function App() {
             </div>
             <form onSubmit={handleFormSubmit} className="p-6 md:p-12 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar">
               <div className="space-y-1.5 md:space-y-2">
-                <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">เลือกธุรกิจที่เป็นเจ้าของรายการ</label>
-                <div className="grid grid-cols-2 md:grid-cols-3 gap-2">
+                <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">
+                  เลือกธุรกิจที่เป็นเจ้าของรายการ
+                  {activeBusinessId === 'all' && !formData.business && (
+                    <span className="ml-2 text-red-500 animate-pulse">← จำเป็น!</span>
+                  )}
+                </label>
+                <div className={`grid grid-cols-2 md:grid-cols-3 gap-2 p-2 rounded-2xl transition-all ${activeBusinessId === 'all' && !formData.business ? 'ring-2 ring-red-300 ring-offset-1' : ''}`}>
                   {businesses.map(b => (
-                    <button key={b.id} type="button" onClick={() => setFormData({ ...formData, business: b.id })} className={`p-4 rounded-2xl border-2 font-black text-xs transition-all flex flex-col items-center gap-1 ${formData.business === b.id ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-md' : 'bg-white border-[#EAE3F4] text-[#7A7585]'}`}>
+                    <button key={b.id} type="button" onClick={() => setFormData({ ...formData, business: b.id, category: (categories[b.id]?.[modalType]?.[0]) || '' })} className={`p-4 rounded-2xl border-2 font-black text-xs transition-all flex flex-col items-center gap-1 ${formData.business === b.id ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-md' : 'bg-white border-[#EAE3F4] text-[#7A7585]'}`}>
                       {getIcon(b.icon)} <span>{b.name}</span>
                     </button>
                   ))}
