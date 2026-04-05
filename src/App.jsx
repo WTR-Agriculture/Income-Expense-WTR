@@ -534,6 +534,14 @@ export default function App() {
                     <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">ราคาต่อหน่วย</label><input type="number" placeholder="0.00" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-3xl outline-none font-black text-xs md:text-sm" /></div>
                     <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">จำนวน</label><input type="number" placeholder="1" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-3xl outline-none font-black text-xs md:text-sm" /></div>
                  </div>
+
+                 <div className="space-y-1.5 md:space-y-2">
+                    <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">ช่องทางการชำระเงิน</label>
+                    <div className="grid grid-cols-2 gap-3">
+                       <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'cash'})} className={`py-4 rounded-2xl font-black text-xs md:text-sm border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'cash' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-lg scale-[1.02]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><Wallet size={16} /> เงินสด</button>
+                       <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'transfer'})} className={`py-4 rounded-2xl font-black text-xs md:text-sm border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'transfer' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20] shadow-lg scale-[1.02]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><ArrowRightLeft size={16} /> เงินโอน</button>
+                    </div>
+                 </div>
                  
                  <div className="space-y-3">
                     <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">แนบรูปภาพ (ใบเสร็จ/สลิป)</label>
