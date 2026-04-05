@@ -1260,7 +1260,7 @@ export default function App() {
       {/* Breakdown Detailed Modal */}
       {isBreakdownOpen && (
         <div className="fixed inset-0 z-[200] bg-white animate-in slide-in-from-right duration-500 flex flex-col">
-          <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center bg-white/50 backdrop-blur-md">
+          <div className="p-6 md:p-10 pt-[calc(1.5rem+env(safe-area-inset-top))] border-b border-[#F8F7FA] flex justify-between items-center bg-white/50 backdrop-blur-md">
             <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase">สัดส่วน{breakdownType === 'income' ? 'รายรับ' : 'รายจ่าย'}แบบเต็ม</h2>
             <button onClick={() => setIsBreakdownOpen(false)} className="bg-[#1D1B20] p-3 md:p-4 rounded-full text-[#DDFD54] shadow-xl hover:scale-110 transitoon-transform"><X size={24} /></button>
           </div>
@@ -1296,7 +1296,7 @@ export default function App() {
       {isModalOpen && (
         <div className="fixed inset-0 z-[750] flex items-end md:items-center justify-center p-2 md:p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-xl rounded-t-[32px] md:rounded-[64px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-8 duration-500 max-h-[90vh]">
-            <div className={`p-6 md:p-14 flex justify-between items-center ${modalType === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>
+            <div className={`p-6 md:p-14 pt-[calc(1.5rem+env(safe-area-inset-top))] flex justify-between items-center ${modalType === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>
               <h2 className="text-2xl md:text-4xl font-black uppercase tracking-tighter leading-none">บันทึกรายการใหม่<br /><span className="text-sm md:text-2xl opacity-60">ระบุ{modalType === 'income' ? 'รายรับ' : 'รายจ่าย'}</span></h2>
               <button onClick={() => setIsModalOpen(false)} className="bg-white/20 p-2 md:p-4 rounded-full active:rotate-90 transition-transform"><X size={20} /></button>
             </div>
@@ -1393,7 +1393,7 @@ export default function App() {
       {/* History Window */}
       {isHistoryOpen && (
         <div className="fixed inset-0 z-[150] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
-          <div className="p-6 md:p-10 border-b border-[#F8F7FA] space-y-4 bg-white/50 backdrop-blur-md sticky top-0 z-20">
+          <div className="p-6 md:p-10 pt-[calc(1.5rem+env(safe-area-inset-top))] border-b border-[#F8F7FA] space-y-4 bg-white/50 backdrop-blur-md sticky top-0 z-20">
             <div className="flex justify-between items-center">
               <h2 className="text-2xl md:text-4xl font-black tracking-tighter uppercase">สมุดบัญชี ({activeBusinessId === 'all' ? 'รวม' : activeBusinessId})</h2>
               <button onClick={() => setIsHistoryOpen(false)} className="bg-[#F8F7FA] p-3 md:p-4 rounded-full text-[#1D1B20] shadow-sm hover:rotate-90 transition-transform"><X size={24} /></button>
