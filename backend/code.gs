@@ -1,7 +1,7 @@
 /**
  * WTR Ledger Backend (Google Apps Script)
  * 
- * Version: 3.0 (Supports Multi-Business & Image Uploads)
+ * Version: 4.0 (Fully Managed: Create, Read, Update, Delete)
  */
 
 function doGet(e) {
@@ -9,7 +9,8 @@ function doGet(e) {
   if (action === 'getTransactions') return getJsonData('Transactions');
   if (action === 'getCategories') return getJsonData('Categories');
   if (action === 'getBusinesses') return getJsonData('Businesses');
-  return ContentService.createTextOutput("WTR Ledger API v3.0 - Multi-Business Enabled").setMimeType(ContentService.MimeType.TEXT);
+  if (action === 'getParties') return getJsonData('Parties');
+  return ContentService.createTextOutput("WTR Ledger API v4.0 - Active").setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
@@ -21,16 +22,15 @@ function doPost(e) {
   }
   
   const action = data.action;
-  
-  if (action === 'addTransaction') {
-    return addTransaction(data.payload);
-  } else if (action === 'addCategory') {
-    return addCategory(data.payload);
-  } else if (action === 'addBusiness') {
-    return addBusiness(data.payload);
-  } else if (action === 'uploadFiles') {
-    return uploadFiles(data.payload);
-  }
+  if (action === 'addTransaction') return addTransaction(data.payload);
+  if (action === 'updateTransaction') return updateTransaction(data.payload);
+  if (action === 'deleteTransaction') return deleteTransaction(data.payload.id);
+  if (action === 'addCategory') return addCategory(data.payload);
+  if (action === 'addBusiness') return addBusiness(data.payload);
+  if (action === 'addParty') return addParty(data.payload);
+  if (action === 'updateParty') return updateParty(data.payload);
+  if (action === 'deleteParty') return deleteParty(data.payload.id);
+  if (action === 'uploadFiles') return uploadFiles(data.payload);
   
   return createResponse({ status: 'error', message: 'Unknown action' });
 }
@@ -39,12 +39,12 @@ function getJsonData(sheetName) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName(sheetName);
   
-  // Auto-create sheets if they don't exist
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
     if (sheetName === 'Transactions') sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'refjob', 'receiptUrl', 'business']);
     if (sheetName === 'Categories') sheet.appendRow(['businessId', 'type', 'name']);
     if (sheetName === 'Businesses') sheet.appendRow(['id', 'name', 'icon']);
+    if (sheetName === 'Parties') sheet.appendRow(['id', 'name', 'type', 'note']);
   }
   
   const data = sheet.getDataRange().getValues();
@@ -63,24 +63,47 @@ function getJsonData(sheetName) {
 function addTransaction(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('Transactions');
-  if (!sheet) {
-    sheet = ss.insertSheet('Transactions');
-    sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'refjob', 'receiptUrl', 'business']);
-  }
-  
   const headers = sheet.getDataRange().getValues()[0];
   const newRow = headers.map(h => payload[h] || "");
   sheet.appendRow(newRow);
   return createResponse({ status: 'success' });
 }
 
+function updateTransaction(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Transactions');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol].toString() === payload.id.toString()) {
+      const updatedRow = headers.map(h => payload[h] !== undefined ? payload[h] : data[i][headers.indexOf(h)]);
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([updatedRow]);
+      return createResponse({ status: 'success' });
+    }
+  }
+  return createResponse({ status: 'error', message: 'Transaction not found' });
+}
+
+function deleteTransaction(id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Transactions');
+  const data = sheet.getDataRange().getValues();
+  const idCol = data[0].indexOf('id');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol].toString() === id.toString()) {
+      sheet.deleteRow(i + 1);
+      return createResponse({ status: 'success' });
+    }
+  }
+  return createResponse({ status: 'error', message: 'Transaction not found' });
+}
+
 function addCategory(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('Categories');
-  if (!sheet) {
-    sheet = ss.insertSheet('Categories');
-    sheet.appendRow(['businessId', 'type', 'name']);
-  }
   sheet.appendRow([payload.businessId, payload.type, payload.name]);
   return createResponse({ status: 'success' });
 }
@@ -88,10 +111,6 @@ function addCategory(payload) {
 function addBusiness(payload) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   let sheet = ss.getSheetByName('Businesses');
-  if (!sheet) {
-    sheet = ss.insertSheet('Businesses');
-    sheet.appendRow(['id', 'name', 'icon']);
-  }
   sheet.appendRow([payload.id, payload.name, payload.icon || "Briefcase"]);
   return createResponse({ status: 'success' });
 }
@@ -100,27 +119,63 @@ function uploadFiles(payload) {
   const folderName = "WTR_Receipts";
   let folder;
   const folders = DriveApp.getFoldersByName(folderName);
-  
-  if (folders.hasNext()) {
-    folder = folders.next();
-  } else {
-    folder = DriveApp.createFolder(folderName);
-  }
-  
-  const urls = payload.files.map((file, index) => {
-    const fileName = `${payload.txId}_${index}_${file.name}`;
-    const contentType = file.type;
+  if (folders.hasNext()) folder = folders.next();
+  else folder = DriveApp.createFolder(folderName);
+
+  const urls = [];
+  payload.files.forEach(file => {
+    const fileName = payload.txId + "_" + file.name;
     const base64Data = file.base64.split(',')[1];
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), contentType, fileName);
-    const driveFile = folder.createFile(blob);
-    driveFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    return driveFile.getUrl();
+    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), file.type, fileName);
+    const uploadedFile = folder.createFile(blob);
+    uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+    urls.push(uploadedFile.getUrl());
   });
-  
+
   return createResponse({ status: 'success', urls: urls });
 }
 
+function addParty(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  let sheet = ss.getSheetByName('Parties');
+  const headers = sheet.getDataRange().getValues()[0];
+  const newRow = headers.map(h => payload[h] || "");
+  sheet.appendRow(newRow);
+  return createResponse({ status: 'success' });
+}
+
+function updateParty(payload) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Parties');
+  const data = sheet.getDataRange().getValues();
+  const headers = data[0];
+  const idCol = headers.indexOf('id');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol].toString() === payload.id.toString()) {
+      const updatedRow = headers.map(h => payload[h] !== undefined ? payload[h] : data[i][headers.indexOf(h)]);
+      sheet.getRange(i + 1, 1, 1, headers.length).setValues([updatedRow]);
+      return createResponse({ status: 'success' });
+    }
+  }
+  return createResponse({ status: 'error', message: 'Party not found' });
+}
+
+function deleteParty(id) {
+  const ss = SpreadsheetApp.getActiveSpreadsheet();
+  const sheet = ss.getSheetByName('Parties');
+  const data = sheet.getDataRange().getValues();
+  const idCol = data[0].indexOf('id');
+  
+  for (let i = 1; i < data.length; i++) {
+    if (data[i][idCol].toString() === id.toString()) {
+      sheet.deleteRow(i + 1);
+      return createResponse({ status: 'success' });
+    }
+  }
+  return createResponse({ status: 'error', message: 'Party not found' });
+}
+
 function createResponse(data) {
-  return ContentService.createTextOutput(JSON.stringify(data))
-    .setMimeType(ContentService.MimeType.JSON);
+  return ContentService.createTextOutput(JSON.stringify(data)).setMimeType(ContentService.MimeType.JSON);
 }
