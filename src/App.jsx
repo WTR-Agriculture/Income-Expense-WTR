@@ -42,6 +42,10 @@ export default function App() {
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [reportPeriod, setReportPeriod] = useState('monthly');
   
+  // Breakdown Modal State
+  const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
+  const [breakdownType, setBreakdownType] = useState('income');
+
   // Sync State
   const [syncStatus, setSyncStatus] = useState('idle'); 
   const [isOnline, setIsOnline] = useState(navigator.onLine);
@@ -109,7 +113,7 @@ export default function App() {
         catData.forEach(c => {
           const bId = c.businessId || 'garage';
           if (!newCats[bId]) newCats[bId] = { income: [], expense: [] };
-          newCats[bId][c.type].push(c.name);
+          if (c.type && c.name) newCats[bId][c.type].push(c.name);
         });
         if (Object.keys(newCats).length > 0) setCategories(prev => ({ ...prev, ...newCats }));
       }
@@ -120,31 +124,34 @@ export default function App() {
 
   useEffect(() => { syncWithGoogleSheets(); }, [syncWithGoogleSheets]);
 
-  // Calculations (Filtered by Active Business)
-  const filteredTransactions = useMemo(() => {
+  // Calculations (Filtered by Active Business & Period)
+  const filteredByBusiness = useMemo(() => {
     if (activeBusinessId === 'all') return transactions;
     return transactions.filter(t => t.business === activeBusinessId);
   }, [transactions, activeBusinessId]);
 
+  const now = new Date();
+  const currentPeriodTransactions = useMemo(() => {
+    return filteredByBusiness.filter(t => {
+      if (!t.date) return true;
+      const tDate = new Date(t.date);
+      if (reportPeriod === 'daily') return tDate.toDateString() === now.toDateString();
+      if (reportPeriod === 'weekly') return (now.getTime() - tDate.getTime()) <= 7 * 24 * 60 * 60 * 1000;
+      if (reportPeriod === 'monthly') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
+      if (reportPeriod === 'yearly') return tDate.getFullYear() === now.getFullYear();
+      return true;
+    });
+  }, [filteredByBusiness, reportPeriod]);
+
   const totals = useMemo(() => {
-    const income = filteredTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
-    const expense = filteredTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    const income = currentPeriodTransactions.filter(t => t.type === 'income').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
+    const expense = currentPeriodTransactions.filter(t => t.type === 'expense').reduce((sum, t) => sum + (parseFloat(t.amount) || 0), 0);
     return { income, expense, balance: income - expense };
-  }, [filteredTransactions]);
+  }, [currentPeriodTransactions]);
 
   const breakdownData = useMemo(() => {
     const calc = (type) => {
-      const now = new Date();
-      const filtered = filteredTransactions.filter(t => {
-        if (t.type !== type) return false;
-        if (!t.date) return true;
-        const tDate = new Date(t.date);
-        if (reportPeriod === 'daily') return tDate.toDateString() === now.toDateString();
-        if (reportPeriod === 'weekly') return (now.getTime() - tDate.getTime()) <= 7 * 24 * 60 * 60 * 1000;
-        if (reportPeriod === 'monthly') return tDate.getMonth() === now.getMonth() && tDate.getFullYear() === now.getFullYear();
-        if (reportPeriod === 'yearly') return tDate.getFullYear() === now.getFullYear();
-        return true;
-      });
+      const filtered = currentPeriodTransactions.filter(t => t.type === type);
       const total = filtered.reduce((s, t) => s + (parseFloat(t.amount) || 0), 0);
       const categoryMap = {};
       filtered.forEach(t => categoryMap[t.category || 'อื่นๆ'] = (categoryMap[t.category || 'อื่นๆ'] || 0) + (parseFloat(t.amount) || 0));
@@ -155,7 +162,27 @@ export default function App() {
       return { total, items };
     };
     return { income: calc('income'), expense: calc('expense') };
-  }, [filteredTransactions, reportPeriod]);
+  }, [currentPeriodTransactions]);
+
+  // Weekly Analysis (For the Bar Chart)
+  const weeklyChartData = useMemo(() => {
+    const weeks = Array(4).fill(0).map((_, i) => ({ label: `W${i+1}`, in: 0, out: 0 }));
+    currentPeriodTransactions.forEach(t => {
+      const d = new Date(t.date);
+      const dayIdx = d.getDate();
+      const weekIdx = Math.min(Math.floor((dayIdx - 1) / 7), 3);
+      if (t.type === 'income') weeks[weekIdx].in += t.amount;
+      else weeks[weekIdx].out += t.amount;
+    });
+    
+    // Normalize to percentages for height
+    const max = Math.max(...weeks.flatMap(w => [w.in, w.out]), 1000);
+    return weeks.map(w => ({
+      ...w,
+      inPerc: (w.in / max) * 100,
+      outPerc: (w.out / max) * 100
+    }));
+  }, [currentPeriodTransactions]);
 
   // Form State
   const [formData, setFormData] = useState({
@@ -316,7 +343,7 @@ export default function App() {
              <div className="lg:col-span-4 bg-white rounded-[32px] md:rounded-[56px] shadow-2xl flex flex-col h-[600px] lg:h-[750px] overflow-hidden border border-[#EAE3F4] animate-in slide-in-from-right-8 duration-700">
                 <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center"><h3 className="font-black text-lg md:text-2xl tracking-tighter uppercase">รายการล่าสุด</h3><button onClick={() => setIsHistoryOpen(true)} className="text-[#AE88F9] font-black text-xs md:text-sm">ดูทั้งหมด</button></div>
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
-                   {filteredTransactions.map(tx => (
+                   {filteredByBusiness.slice(0, 10).map(tx => (
                      <div key={tx.id} className="flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] md:rounded-[32px] hover:bg-[#F2EFF5] transition-all group">
                         <div className="flex items-center gap-3 md:gap-4 min-w-0">
                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />)}</div>
@@ -325,7 +352,7 @@ export default function App() {
                         <p className={`font-black text-xs md:text-base tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{formatCurrency(tx.amount)}</p>
                      </div>
                    ))}
-                   {filteredTransactions.length === 0 && <div className="h-full flex items-center justify-center text-[#7A7585] font-black opacity-30 uppercase">ยังไม่มีข้อมูล</div>}
+                   {filteredByBusiness.length === 0 && <div className="h-full flex items-center justify-center text-[#7A7585] font-black opacity-30 uppercase">ยังไม่มีข้อมูล</div>}
                 </div>
              </div>
           </div>
@@ -333,23 +360,127 @@ export default function App() {
 
         {activeTab === 'reports' && (
           <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-             <div className="flex justify-between items-end pt-4">
-               <div><h2 className="text-3xl md:text-5xl font-black text-[#1D1B20] tracking-tighter">รายงานยอดเงิน</h2><p className="text-[#7A7585] text-xs md:text-sm font-bold mt-2">สรุปรายการสัดส่วน {activeBusinessId === 'all' ? 'ทุกธุรกิจ' : (businesses.find(b => b.id === activeBusinessId)?.name)}</p></div>
-               <div className="bg-white p-1 rounded-full shadow-sm border border-[#EAE3F4] flex overflow-x-auto no-scrollbar">{['daily', 'weekly', 'monthly', 'yearly'].map(p => (<button key={p} onClick={() => setReportPeriod(p)} className={`px-3 md:px-5 py-1.5 md:py-2 font-black text-[10px] md:text-xs rounded-full transition-all whitespace-nowrap ${reportPeriod === p ? 'bg-[#1D1B20] text-[#DDFD54]' : 'text-[#7A7585]'}`}>{p.toUpperCase()}</button>))}</div>
+             <div className="flex flex-col xl:flex-row justify-between items-start xl:items-end gap-6 pt-4">
+               <div>
+                  <h2 className="text-3xl md:text-5xl font-black text-[#1D1B20] tracking-tighter">Reports</h2>
+                  <p className="text-[#7A7585] text-xs md:text-sm font-bold mt-2">สรุปภาพรวม {activeBusinessId === 'all' ? 'ทุกธุรกิจ' : (businesses.find(b => b.id === activeBusinessId)?.name)}</p>
+               </div>
+               
+               <div className="flex flex-col sm:flex-row items-center gap-3 w-full xl:w-auto">
+                  <div className="bg-white p-1.5 rounded-full shadow-sm border border-[#EAE3F4] flex overflow-x-auto no-scrollbar w-full sm:w-auto">
+                    {[
+                      {id: 'daily', label: 'รายวัน'}, {id: 'weekly', label: 'รายสัปดาห์'}, {id: 'monthly', label: 'รายเดือน'}, {id: 'yearly', label: 'รายปี'}
+                    ].map(p => (
+                      <button key={p.id} onClick={() => setReportPeriod(p.id)} className={`px-4 py-2 font-black text-[10px] md:text-xs rounded-full transition-all whitespace-nowrap ${reportPeriod === p.id ? 'bg-[#1D1B20] text-[#DDFD54]' : 'text-[#7A7585]'}`}>{p.label}</button>
+                    ))}
+                  </div>
+
+                  <button className="w-full sm:w-auto flex items-center justify-between gap-3 bg-white border-2 border-[#EAE3F4] px-5 py-2.5 rounded-full font-black text-[#1D1B20] text-xs">
+                    <Calendar size={16} className="text-[#AE88F9]" />
+                    <span>{reportPeriod === 'monthly' ? now.toLocaleDateString('th-TH', { month: 'long', year: 'numeric' }) : 'ช่วงเวลานี้'}</span>
+                    <ChevronDown size={14} />
+                  </button>
+
+                  <button className="w-full sm:w-auto flex items-center justify-center gap-2 bg-[#DDFD54] px-6 py-2.5 rounded-full font-black text-[#1D1B20] text-xs shadow-md"><Download size={16} /> Export</button>
+               </div>
              </div>
-             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                <div className="bg-white border-2 border-[#EAE3F4] p-6 md:p-10 rounded-[32px] md:rounded-[48px] h-[400px] flex flex-col shadow-sm">
-                   <h3 className="font-black text-lg md:text-2xl mb-6 flex items-center gap-2"><ArrowUpRight className="text-emerald-500" /> สัดส่วนรายรับ</h3>
-                   <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-                      {breakdownData.income.items.map((it, idx) => (<div key={idx} className="space-y-2"><div className="flex justify-between font-black text-[10px] md:text-sm uppercase"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div><div className="h-3 bg-[#F8F7FA] rounded-full overflow-hidden"><div className="h-full bg-[#DDFD54] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div></div>))}
-                      {breakdownData.income.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30 uppercase">No Data</p>}
+
+             {/* KPIs */}
+             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                <div className="bg-[#1D1B20] p-8 md:p-10 rounded-[40px] text-white shadow-2xl relative overflow-hidden group">
+                   <div className="absolute top-0 right-0 w-32 h-32 bg-[#DDFD54]/10 rounded-full blur-3xl -mr-16 -mt-16"></div>
+                   <div className="flex items-center gap-2 mb-8"><div className="bg-[#333038] p-2 rounded-full text-[#DDFD54]"><Wallet size={20}/></div><span className="font-black text-xs text-white/60">กำไรสุทธิ (Net Profit)</span></div>
+                   <h3 className="text-4xl md:text-5xl font-black tracking-tighter mb-2">{formatCurrency(totals.balance)}</h3>
+                   <div className="flex items-center gap-1 text-[10px] font-black text-[#DDFD54]"><TrendingUp size={14} /> +12.5% vs Last Period</div>
+                </div>
+
+                <div className="bg-[#DDFD54] p-8 md:p-10 rounded-[40px] shadow-sm flex flex-col justify-between">
+                   <div className="flex items-center gap-2 mb-8"><div className="bg-white/40 p-2 rounded-full"><ArrowUpRight size={20}/></div><span className="font-black text-xs text-black/40">รายรับรวม (Income)</span></div>
+                   <div><h3 className="text-3xl md:text-4xl font-black tracking-tighter">{formatCurrency(totals.income)}</h3><p className="text-[10px] font-black text-black/40 mt-1">เป้าหมาย: ฿250,000</p></div>
+                </div>
+
+                <div className="bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[40px] shadow-sm flex flex-col justify-between">
+                   <div className="flex items-center gap-2 mb-8"><div className="bg-[#F8F7FA] p-2 rounded-full text-[#AE88F9]"><ArrowDownRight size={20}/></div><span className="font-black text-xs text-[#7A7585]">รายจ่ายรวม (Expense)</span></div>
+                   <div><h3 className="text-3xl md:text-4xl font-black tracking-tighter">{formatCurrency(totals.expense)}</h3><p className="text-[10px] font-black text-[#AE88F9] mt-1">การควบคุมค่าใช้จ่ายยอดเยี่ยม</p></div>
+                </div>
+             </div>
+
+             {/* Chart View */}
+             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="lg:col-span-2 bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[40px] shadow-sm h-[400px] flex flex-col">
+                   <div className="flex justify-between items-center mb-8">
+                      <h3 className="font-black text-xl tracking-tighter">กระแสเงินสดรายสัปดาห์</h3>
+                      <div className="flex gap-4 text-[10px] font-black uppercase text-[#7A7585]">
+                         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#DDFD54]"></span>รายรับ</div>
+                         <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#AE88F9]"></span>รายจ่าย</div>
+                      </div>
+                   </div>
+                   <div className="flex-1 flex items-end justify-between gap-4 md:gap-10 pb-2 border-b-2 border-[#F8F7FA]">
+                      {weeklyChartData.map((week, idx) => (
+                        <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full gap-3 group">
+                           <div className="flex w-full items-end justify-center gap-1 sm:gap-2 h-full">
+                              <div className="w-full max-w-[50px] bg-[#DDFD54] rounded-t-xl transition-all duration-700" style={{ height: `${week.inPerc}%` }}></div>
+                              <div className="w-full max-w-[50px] bg-[#AE88F9] rounded-t-xl transition-all duration-700" style={{ height: `${week.outPerc}%` }}></div>
+                           </div>
+                           <span className="text-[10px] font-black text-[#7A7585]">{week.label}</span>
+                        </div>
+                      ))}
                    </div>
                 </div>
-                <div className="bg-white border-2 border-[#EAE3F4] p-6 md:p-10 rounded-[32px] md:rounded-[48px] h-[400px] flex flex-col shadow-sm">
-                   <h3 className="font-black text-lg md:text-2xl mb-6 flex items-center gap-2"><ArrowDownRight className="text-[#AE88F9]" /> สัดส่วนรายจ่าย</h3>
-                   <div className="flex-1 space-y-4 overflow-y-auto custom-scrollbar pr-2">
-                       {breakdownData.expense.items.map((it, idx) => (<div key={idx} className="space-y-2"><div className="flex justify-between font-black text-[10px] md:text-sm uppercase"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div><div className="h-3 bg-[#F8F7FA] rounded-full overflow-hidden"><div className="h-full bg-[#AE88F9] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div></div>))}
-                       {breakdownData.expense.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30 uppercase">No Data</p>}
+
+                <div className="bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[40px] shadow-sm flex flex-col h-[450px]">
+                   <h3 className="font-black text-xl tracking-tighter mb-8">สัดส่วนรายรับ</h3>
+                   <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                      {breakdownData.income.items.map((it, idx) => (
+                        <div key={idx} className="space-y-3">
+                           <div className="flex justify-between font-black text-xs md:text-sm uppercase text-[#1D1B20]"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div>
+                           <div className="h-3.5 bg-[#F8F7FA] rounded-full overflow-hidden border border-[#EAE3F4]/30"><div className="h-full bg-[#DDFD54] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div>
+                        </div>
+                      ))}
+                      {breakdownData.income.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30">ไม่มีข้อมูลรายรับ</p>}
+                   </div>
+                   <button onClick={() => { setBreakdownType('income'); setIsBreakdownOpen(true); }} className="mt-8 w-full py-4 bg-[#F8F7FA] rounded-2xl font-black text-xs text-[#1D1B20] hover:bg-[#F2EFF5]">ดูรายละเอียดทั้งหมด</button>
+                </div>
+
+                <div className="bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[40px] shadow-sm flex flex-col h-[450px]">
+                   <h3 className="font-black text-xl tracking-tighter mb-8">สัดส่วนรายจ่าย</h3>
+                   <div className="flex-1 space-y-6 overflow-y-auto pr-2 custom-scrollbar">
+                       {breakdownData.expense.items.map((it, idx) => (
+                        <div key={idx} className="space-y-3">
+                           <div className="flex justify-between font-black text-xs md:text-sm uppercase text-[#1D1B20]"><span>{it.name}</span><span>{formatCurrency(it.amount)}</span></div>
+                           <div className="h-3.5 bg-[#F8F7FA] rounded-full overflow-hidden border border-[#EAE3F4]/30"><div className="h-full bg-[#AE88F9] transition-all duration-1000" style={{ width: `${it.percent}%` }}></div></div>
+                        </div>
+                      ))}
+                      {breakdownData.expense.items.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30">ไม่มีข้อมูลรายจ่าย</p>}
+                   </div>
+                   <button onClick={() => { setBreakdownType('expense'); setIsBreakdownOpen(true); }} className="mt-8 w-full py-4 bg-[#F8F7FA] rounded-2xl font-black text-xs text-[#1D1B20] hover:bg-[#F2EFF5]">ดูรายละเอียดทั้งหมด</button>
+                </div>
+             </div>
+
+             {/* Recent Transactions Part in Reports */}
+             <div className="bg-white border-2 border-[#EAE3F4] rounded-[40px] shadow-sm overflow-hidden flex flex-col">
+                <div className="p-8 border-b border-[#F8F7FA] flex justify-between items-center bg-white z-10 sticky top-0">
+                   <div><h3 className="font-black text-xl tracking-tighter">รายการบัญชีในช่วงเวลา</h3><p className="text-[10px] font-black text-[#7A7585] mt-1">{reportPeriod.toUpperCase()} SUMMARY</p></div>
+                   <button onClick={() => setIsHistoryOpen(true)} className="px-5 py-2.5 bg-[#F8F7FA] rounded-full font-black text-xs">ดูสเตทเมนท์แบบเต็บ</button>
+                </div>
+                <div className="p-6 md:p-8 space-y-3 overflow-x-auto">
+                   <div className="min-w-[600px] md:min-w-0 space-y-3">
+                      {currentPeriodTransactions.slice(0, 10).map(tx => (
+                        <div key={tx.id} className="flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] hover:bg-[#F2EFF5] transition-all group">
+                           <div className="flex items-center gap-4 min-w-0 flex-1">
+                              <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />)}</div>
+                              <div className="truncate"><h4 className="font-black text-[#1D1B20] text-sm md:text-base mb-1 truncate">{tx.desc}</h4><p className="text-[9px] md:text-xs font-black text-[#7A7585] uppercase truncate">{tx.party} • {tx.date} • {tx.business.toUpperCase()}</p></div>
+                           </div>
+                           <div className="flex items-center gap-4 text-right">
+                              <span className="hidden sm:inline-block bg-white border border-[#EAE3F4] text-[9px] font-black px-3 py-1 rounded-full">{tx.category}</span>
+                              <div className="min-w-[100px]">
+                                 <p className={`font-black text-sm md:text-lg tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString()}</p>
+                                 <p className="text-[9px] font-black text-[#7A7585] bg-white px-2 py-0.5 rounded-full inline-block mt-0.5">{tx.method === 'cash' ? 'เงินสด' : 'เงินโอน'}</p>
+                              </div>
+                           </div>
+                        </div>
+                      ))}
+                      {currentPeriodTransactions.length === 0 && <p className="text-center py-20 text-[#7A7585] font-black opacity-30">ไม่มีรายการในช่วงเวลานี้</p>}
                    </div>
                 </div>
              </div>
@@ -383,6 +514,41 @@ export default function App() {
           </div>
         )}
       </main>
+
+      {/* Breakdown Detailed Modal */}
+      {isBreakdownOpen && (
+        <div className="fixed inset-0 z-[200] bg-white animate-in slide-in-from-right duration-500 flex flex-col">
+           <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center bg-white/50 backdrop-blur-md">
+              <h2 className="text-2xl md:text-5xl font-black tracking-tighter uppercase">สัดส่วน{breakdownType === 'income' ? 'รายรับ' : 'รายจ่าย'}แบบเต็ม</h2>
+              <button onClick={() => setIsBreakdownOpen(false)} className="bg-[#1D1B20] p-3 md:p-4 rounded-full text-[#DDFD54] shadow-xl hover:scale-110 transitoon-transform"><X size={24} /></button>
+           </div>
+           <div className="flex-1 overflow-y-auto p-4 md:p-10">
+              <div className="max-w-4xl mx-auto space-y-10">
+                 <div className="bg-[#F8F7FA] p-10 rounded-[48px] text-center">
+                    <p className="text-xs font-black opacity-40 uppercase tracking-widest mb-2">ยอดรวมหมวดหมู่ทั้งหมด</p>
+                    <h3 className="text-4xl md:text-7xl font-black tracking-tighter">{formatCurrency(breakdownData[breakdownType].total)}</h3>
+                 </div>
+                 <div className="space-y-8">
+                    {breakdownData[breakdownType].items.map((it, idx) => (
+                      <div key={idx} className="bg-white p-8 rounded-[40px] border-2 border-[#F2EFF5] shadow-sm transform transition hover:scale-[1.01]">
+                        <div className="flex justify-between items-center mb-4">
+                           <div className="flex items-center gap-4">
+                              <div className="w-12 h-12 rounded-2xl flex items-center justify-center font-black" style={{ backgroundColor: it.color, color: it.color === '#DDFD54' ? '#1D1B20' : 'white' }}>{idx+1}</div>
+                              <h4 className="font-black text-2xl tracking-tighter">{it.name}</h4>
+                           </div>
+                           <div className="text-right">
+                              <p className="text-2xl font-black tracking-tighter">{formatCurrency(it.amount)}</p>
+                              <p className="text-[10px] font-black opacity-30">{it.percent}% OF TOTAL</p>
+                           </div>
+                        </div>
+                        <div className="h-4 bg-[#F8F7FA] rounded-full overflow-hidden"><div className="h-full transition-all duration-1000" style={{ width: `${it.percent}%`, backgroundColor: it.color }}></div></div>
+                      </div>
+                    ))}
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* Entry Modal */}
       {isModalOpen && (
@@ -459,6 +625,7 @@ export default function App() {
         </div>
       )}
 
+      {/* History Window */}
       {isHistoryOpen && (
         <div className="fixed inset-0 z-[150] bg-white animate-in slide-in-from-bottom duration-500 flex flex-col">
            <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center bg-white/50 backdrop-blur-md sticky top-0 z-20">
@@ -467,11 +634,11 @@ export default function App() {
            </div>
            <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-3">
               <div className="max-w-4xl mx-auto space-y-3">
-                 {filteredTransactions.map(tx => (
+                 {filteredByBusiness.map(tx => (
                     <div key={tx.id} className="flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[32px] shadow-sm">
                        <div className="flex items-center gap-4 md:gap-6 min-w-0">
                           <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-black shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={20}/> : <ArrowDownRight size={20}/>)}</div>
-                          <div className="truncate"><p className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</p><p className="text-[10px] uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.business} • {tx.party}</p></div>
+                          <div className="truncate"><h4 className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</h4><p className="text-[10px] uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.business} • {tx.party}</p></div>
                        </div>
                        <div className="text-right ml-4"><p className={`text-sm md:text-2xl font-black tracking-tighter ${tx.type === 'income' ? 'text-emerald-500' : 'text-rose-500'}`}>{tx.type === 'income' ? '+' : '-'} {formatCurrency(tx.amount)}</p></div>
                     </div>
