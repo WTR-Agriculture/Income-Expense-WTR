@@ -1,4 +1,5 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
+import { useRegisterSW } from 'virtual:pwa-register/react';
 import {
   Plus, Minus, Wallet,
   FileText, ArrowRightLeft, Camera, X,
@@ -60,6 +61,24 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState('businesses'); // 'businesses' | 'parties'
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  // --- PWA Reload Prompt Logic ---
+  const {
+    offlineReady: [offlineReady, setOfflineReady],
+    needRefresh: [needRefresh, setNeedRefresh],
+    updateServiceWorker,
+  } = useRegisterSW({
+    onRegistered(r) {
+      console.log('SW Registered: ', r);
+    },
+    onRegisterError(error) {
+      console.log('SW Registration error: ', error);
+    },
+  });
+
+  const closeUpdatePrompt = () => {
+    setOfflineReady(false);
+    setNeedRefresh(false);
+  };
 
   // File Upload State
   const [selectedImages, setSelectedImages] = useState([]);
@@ -1594,6 +1613,38 @@ export default function App() {
               <div className="grid grid-cols-2 gap-3 pt-6">
                 <button onClick={(e) => { e.stopPropagation(); handleEditClick(selectedDetailTx); setTimeout(() => setIsDetailModalOpen(false), 50); }} className="py-3.5 bg-white border-2 border-[#1D1B20] text-[#1D1B20] rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#F8F7FA] transition-all shadow-sm active:scale-95"><Pencil size={18} /> แก้ไขข้อมูล</button>
                 <button onClick={(e) => { e.stopPropagation(); setTxToDelete(selectedDetailTx); setIsDeleteModalOpen(true); }} className="py-3.5 bg-rose-50 text-rose-600 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-rose-100 transition-all shadow-sm active:scale-95"><Trash2 size={18} /> ลบรายการนี้</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
+      {/* PWA Reload Prompt (Floating Update Banner) */}
+      {needRefresh && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[2000] w-[calc(100%-2rem)] max-w-sm animate-in slide-in-from-bottom-10 duration-700">
+          <div className="bg-[#1D1B20] border-2 border-[#DDFD54]/30 p-6 rounded-[32px] shadow-[0_20px_50px_rgba(0,0,0,0.8)] backdrop-blur-xl relative overflow-hidden group">
+            <div className="absolute inset-0 bg-gradient-to-br from-[#AE88F9]/15 to-transparent opacity-50 group-hover:opacity-100 transition-opacity"></div>
+            
+            <div className="relative flex flex-col items-center gap-5 text-center">
+              <div className="w-16 h-16 bg-[#DDFD54]/10 rounded-full flex items-center justify-center animate-pulse">
+                <RefreshCcw size={32} className="text-[#DDFD54]" />
+              </div>
+              
+              <div>
+                <h4 className="text-white font-black text-xl tracking-tighter uppercase leading-none mb-2">New Version Ready</h4>
+                <p className="text-[#7A7585] text-xs font-black uppercase tracking-widest leading-relaxed">พบเวอร์ชันล่าสุดจาก [WTR HQ]<br />อัปเดตเพื่อรับฟีเจอร์ใหม่ทันทีค่ะ</p>
+              </div>
+
+              <div className="flex gap-3 w-full mt-2">
+                <button 
+                  onClick={() => updateServiceWorker(true)}
+                  className="flex-1 bg-[#DDFD54] text-[#1D1B20] py-4 rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl active:scale-95 transition-all hover:bg-[#DDFD54]/90">
+                  UPDATE NOW
+                </button>
+                <button 
+                  onClick={closeUpdatePrompt}
+                  className="px-6 bg-white/5 text-white/50 border border-white/10 py-4 rounded-2xl font-black text-xs uppercase tracking-widest hover:bg-white/10 transition-all">
+                  SKIP
+                </button>
               </div>
             </div>
           </div>
