@@ -341,8 +341,15 @@ export default function App() {
           redirect: 'follow'
         });
         const uploadData = await uploadRes.json();
-        if (uploadData.status === 'success') receiptUrls = uploadData.urls.join(", ");
-      } catch (err) { console.error("Upload failed", err); }
+        if (uploadData.status === 'success' && uploadData.urls.length > 0) {
+          receiptUrls = uploadData.urls.join(", ");
+        } else {
+          alert("คำเตือน: อัพโหลดรูปไม่สำเร็จ ข้อมูลจะถูกบันทึกโดยไม่มีรูป");
+        }
+      } catch (err) { 
+        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเพื่ออัพโหลดรูป");
+        console.error("Upload failed", err); 
+      }
     }
 
     const submitTransaction = async (finalPartyName) => {

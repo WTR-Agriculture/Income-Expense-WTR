@@ -116,21 +116,38 @@ function addBusiness(payload) {
 }
 
 function uploadFiles(payload) {
-  const folderName = "WTR_Receipts";
+  // ใส่ Folder ID ที่แน่นอนที่พี่สาวสร้างไว้ เพื่อความชัวร์ (จากรูปของพี่สาว)
+  const FOLDER_ID = "17K8ZLYzlQx9vFZFQSWy5u1YeOlnwpzW"; 
   let folder;
-  const folders = DriveApp.getFoldersByName(folderName);
-  if (folders.hasNext()) folder = folders.next();
-  else folder = DriveApp.createFolder(folderName);
+  
+  try {
+    folder = DriveApp.getFolderById(FOLDER_ID);
+  } catch (e) {
+    // ถ้าหาจาก ID ไม่เจอจริงๆ (เช่น ID ผิด) ให้หาจากชื่อแทน
+    const folders = DriveApp.getFoldersByName("WTR_Receipts");
+    if (folders.hasNext()) folder = folders.next();
+    else folder = DriveApp.createFolder("WTR_Receipts");
+  }
 
   const urls = [];
-  payload.files.forEach(file => {
-    const fileName = payload.txId + "_" + file.name;
-    const base64Data = file.base64.split(',')[1];
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), file.type, fileName);
-    const uploadedFile = folder.createFile(blob);
-    uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    urls.push(uploadedFile.getUrl());
-  });
+  if (payload.files && payload.files.length > 0) {
+    payload.files.forEach(file => {
+      try {
+        const fileName = (payload.txId || Date.now()) + "_" + file.name;
+        const base64Data = file.base64.split(',')[1];
+        const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), file.type, fileName);
+        const uploadedFile = folder.createFile(blob);
+        
+        // แชร์รูปแบบสาธารณะเพื่อให้แอพแสดงผลได้
+        uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
+        urls.push(uploadedFile.getUrl());
+        
+        console.log("Uploaded: " + fileName);
+      } catch (err) {
+        console.error("Single file upload error: " + err.toString());
+      }
+    });
+  }
 
   return createResponse({ status: 'success', urls: urls });
 }
