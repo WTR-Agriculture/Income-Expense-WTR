@@ -698,42 +698,44 @@ export default function App() {
       )}
       {/* Category Edit Modal */}
       {isEditCategoryModalOpen && (
-        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-[#1D1B20]/60 backdrop-blur-md">
-           <div className="bg-white p-8 md:p-14 rounded-[48px] md:rounded-[64px] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
-              <div className="flex justify-between items-center mb-8">
+        <div className="fixed inset-0 z-[250] flex items-end md:items-center justify-center p-2 md:p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white p-5 md:p-12 rounded-t-[32px] md:rounded-[56px] w-full max-w-2xl shadow-2xl animate-in slide-in-from-bottom duration-300 max-h-[92vh] flex flex-col">
+              <div className="flex justify-between items-center mb-6">
                  <div>
-                    <h3 className="text-2xl md:text-4xl font-black tracking-tighter uppercase">จัดการหมวดหมู่</h3>
-                    <p className="text-xs font-black text-[#7A7585] mt-1">ธุรกิจ: {businesses.find(b => b.id === editingBusinessId)?.name}</p>
+                    <h3 className="text-xl md:text-3xl font-black tracking-tighter uppercase">จัดการหมวดหมู่</h3>
+                    <p className="text-[10px] font-black text-[#7A7585] mt-0.5">ธุรกิจ: {businesses.find(b => b.id === editingBusinessId)?.name}</p>
                  </div>
-                 <button onClick={() => setIsEditCategoryModalOpen(false)} className="bg-[#F8F7FA] p-4 rounded-full text-[#1D1B20] hover:rotate-90 transition-transform"><X size={24} /></button>
+                 <button onClick={() => setIsEditCategoryModalOpen(false)} className="bg-[#F8F7FA] p-3 md:p-4 rounded-full text-[#1D1B20] hover:rotate-90 transition-transform"><X size={20} /></button>
               </div>
 
-              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-10">
+              <div className="flex-1 overflow-y-auto pr-1 custom-scrollbar space-y-6 md:space-y-10">
                  {/* Add New Category Form */}
-                 <div className="bg-[#F8F7FA] p-8 rounded-[40px] space-y-4">
-                    <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">เพิ่มหมวดหมู่ใหม่</p>
-                    <div className="flex gap-3">
-                       <select value={newCatInEdit.type} onChange={e => setNewCatInEdit({...newCatInEdit, type: e.target.value})} className="bg-white border-2 border-[#EAE3F4] px-4 py-3 rounded-2xl font-black text-xs outline-none focus:border-[#AE88F9]">
+                 <div className="bg-[#F8F7FA] p-5 md:p-8 rounded-[24px] md:rounded-[40px] space-y-3">
+                    <p className="text-[9px] font-black uppercase opacity-40 tracking-widest">เพิ่มหมวดหมู่ใหม่</p>
+                    <div className="flex flex-col sm:flex-row gap-2">
+                       <select value={newCatInEdit.type} onChange={e => setNewCatInEdit({...newCatInEdit, type: e.target.value})} className="bg-white border-2 border-[#EAE3F4] px-3 py-2.5 rounded-xl md:rounded-2xl font-black text-xs outline-none focus:border-[#AE88F9]">
                           <option value="income">รายรับ (+)</option>
                           <option value="expense">รายจ่าย (-)</option>
                        </select>
-                       <input type="text" value={newCatInEdit.name} onChange={e => setNewCatInEdit({...newCatInEdit, name: e.target.value})} placeholder="ชื่อหมวดหมู่..." className="flex-1 bg-white border-2 border-[#EAE3F4] px-5 py-3 rounded-2xl font-black text-sm outline-none focus:border-[#1D1B20]" />
-                       <button onClick={handleAddCategoryInEdit} className="bg-[#1D1B20] text-[#DDFD54] px-6 py-3 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-transform"><Plus size={20}/></button>
+                       <div className="flex flex-1 gap-2">
+                          <input type="text" value={newCatInEdit.name} onChange={e => setNewCatInEdit({...newCatInEdit, name: e.target.value})} placeholder="ชื่อหมวดหมู่..." className="flex-1 bg-white border-2 border-[#EAE3F4] px-4 py-2.5 rounded-xl md:rounded-2xl font-black text-sm outline-none focus:border-[#1D1B20]" />
+                          <button onClick={handleAddCategoryInEdit} className="bg-[#1D1B20] text-[#DDFD54] px-5 py-2.5 rounded-xl md:rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-transform"><Plus size={18}/></button>
+                       </div>
                     </div>
                  </div>
 
                  {/* List Categories */}
-                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6 md:gap-8">
                     {['income', 'expense'].map(type => (
-                       <div key={type} className="space-y-4">
-                          <h4 className={`font-black text-lg flex items-center gap-2 ${type === 'income' ? 'text-emerald-500' : 'text-[#AE88F9]'}`}>
-                             {type === 'income' ? <ArrowUpRight size={18}/> : <ArrowDownRight size={18}/>} หมวดหมู่{type === 'income' ? 'รายรับ' : 'รายจ่าย'}
+                       <div key={type} className="space-y-3">
+                          <h4 className={`font-black text-base md:text-lg flex items-center gap-2 ${type === 'income' ? 'text-emerald-500' : 'text-[#AE88F9]'}`}>
+                             {type === 'income' ? <ArrowUpRight size={16}/> : <ArrowDownRight size={16}/>} {type === 'income' ? 'รายรับ' : 'รายจ่าย'}
                           </h4>
                           <div className="space-y-2">
                              {(categories[editingBusinessId]?.[type] || []).map(cat => (
-                                <div key={cat} className="flex justify-between items-center p-4 bg-white border-2 border-[#F2EFF5] rounded-2xl group hover:border-[#1D1B20] transition-colors">
-                                   <span className="font-black text-sm">{cat}</span>
-                                   <button onClick={() => handleDeleteCategoryInEdit(type, cat)} className="text-rose-400 opacity-0 group-hover:opacity-100 p-2 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={16}/></button>
+                                <div key={cat} className="flex justify-between items-center p-3 md:p-4 bg-white border-2 border-[#F2EFF5] rounded-xl md:rounded-2xl group hover:border-[#1D1B20] transition-colors">
+                                   <span className="font-black text-xs md:text-sm">{cat}</span>
+                                   <button onClick={() => handleDeleteCategoryInEdit(type, cat)} className="text-rose-400 opacity-60 md:opacity-0 group-hover:opacity-100 p-2 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={14}/></button>
                                 </div>
                              ))}
                              {(categories[editingBusinessId]?.[type] || []).length === 0 && <p className="text-[10px] font-black opacity-30 text-center py-4">ไม่มีข้อมูล</p>}
@@ -742,7 +744,7 @@ export default function App() {
                     ))}
                  </div>
               </div>
-              <button onClick={() => setIsEditCategoryModalOpen(false)} className="mt-8 w-full py-5 bg-[#1D1B20] text-white rounded-[24px] font-black text-lg shadow-xl">บันทึกและปิดหน้าต่าง</button>
+              <button onClick={() => setIsEditCategoryModalOpen(false)} className="mt-6 w-full py-4 md:py-5 bg-[#1D1B20] text-white rounded-2xl md:rounded-[24px] font-black text-base md:text-lg shadow-xl">บันทึกและปิด</button>
            </div>
         </div>
       )}
