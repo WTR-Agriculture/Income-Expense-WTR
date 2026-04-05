@@ -1237,6 +1237,35 @@ export default function App() {
               <button onClick={() => setIsModalOpen(false)} className="bg-white/20 p-2 md:p-4 rounded-full active:rotate-90 transition-transform"><X size={20} /></button>
             </div>
             <form onSubmit={handleFormSubmit} className="p-6 md:p-12 space-y-4 md:space-y-6 overflow-y-auto custom-scrollbar">
+              {/* --- Bill Header (Top Section) --- */}
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm" /></div>
+                <div className="space-y-1.5 md:space-y-2">
+                  <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">เลขที่อ้างอิงเอกสาร (refjob)</label>
+                  <input type="text" placeholder="ระบุเลขที่บิล/อ้างอิง..." value={formData.refjob} onChange={e => setFormData({ ...formData, refjob: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm focus:border-[#AE88F9] border-2 border-dashed border-[#EAE3F4]" />
+                </div>
+              </div>
+
+              <div className="space-y-1.5 md:space-y-2">
+                <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">{modalType === 'income' ? 'รับจากลูกค้า' : 'จ่ายให้ร้านค้า'}</label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    list="parties-list"
+                    placeholder={modalType === 'income' ? 'ระบุชื่อลูกค้า...' : 'ระบุชื่อร้านค้า...'}
+                    value={formData.partyName}
+                    onChange={e => setFormData({ ...formData, partyName: e.target.value })}
+                    className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-sm focus:border-black border-2 border-transparent transition"
+                  />
+                  <datalist id="parties-list">
+                    {sortedPartiesByFrequency
+                      .filter(p => p.type === (modalType === 'income' ? 'customer' : 'supplier'))
+                      .map(p => <option key={p.id} value={p.name} />)
+                    }
+                  </datalist>
+                </div>
+              </div>
+
               <div className="space-y-1.5 md:space-y-2">
                 <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">
                   เลือกธุรกิจที่เป็นเจ้าของรายการ
@@ -1334,34 +1363,6 @@ export default function App() {
                       </div>
                     </div>
                   ))}
-                </div>
-              </div>
-
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({ ...formData, date: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm" /></div>
-                <div className="space-y-1.5 md:space-y-2">
-                  <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">เลขที่อ้างอิงเอกสาร (refjob)</label>
-                  <input type="text" placeholder="ระบุเลขที่บิล/อ้างอิง..." value={formData.refjob} onChange={e => setFormData({ ...formData, refjob: e.target.value })} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm focus:border-[#AE88F9] border-2 border-dashed border-[#EAE3F4]" />
-                </div>
-              </div>
-
-              <div className="space-y-1.5 md:space-y-2">
-                <label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">รับจากลูกค้า / จ่ายให้ร้านค้า</label>
-                <div className="relative">
-                  <input
-                    type="text"
-                    list="parties-list"
-                    placeholder={modalType === 'income' ? 'ระบุชื่อลูกค้า...' : 'ระบุชื่อร้านค้า...'}
-                    value={formData.partyName}
-                    onChange={e => setFormData({ ...formData, partyName: e.target.value })}
-                    className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-sm focus:border-black border-2 border-transparent transition"
-                  />
-                  <datalist id="parties-list">
-                    {sortedPartiesByFrequency
-                      .filter(p => p.type === (modalType === 'income' ? 'customer' : 'supplier'))
-                      .map(p => <option key={p.id} value={p.name} />)
-                    }
-                  </datalist>
                 </div>
               </div>
 
