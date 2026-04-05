@@ -8,7 +8,7 @@ import {
   Download, TrendingUp, TrendingDown, ChevronDown, List,
   Building2, Users, Database, Trash2, Bell, Shield, LogOut,
   ChevronRight, Trash, RefreshCcw, Wifi, WifiOff, CloudUpload, Image as ImageIcon,
-  Wrench, Leaf, ShoppingCart, Tractor, Factory, AlertCircle, Check, Trash2, PieChart, Home, Settings, Menu, X, ArrowUpRight, ArrowDownRight, Briefcase, Calendar, ChevronDown, Download, TrendingUp, Wallet
+  Wrench, Leaf, ShoppingCart, Tractor, Factory, AlertCircle, Check
 } from 'lucide-react';
 
 const STORAGE_KEYS = {
@@ -71,6 +71,7 @@ export default function App() {
   const [selectedParty, setSelectedParty] = useState(null);
   const [isNewPartyPromptOpen, setIsNewPartyPromptOpen] = useState(false);
   const [tempNewPartyName, setTempNewPartyName] = useState('');
+  const [tempReceiptUrls, setTempReceiptUrls] = useState('');
 
   // Data State with Cache
   const [businesses, setBusinesses] = useState(() => {
@@ -368,8 +369,8 @@ export default function App() {
     const partyExists = parties.some(p => p.name.trim().toLowerCase() === formData.partyName.trim().toLowerCase());
     if (!partyExists && formData.partyName.trim() !== '' && formData.partyName.trim() !== 'ทั่วไป' && !isEditMode) {
       setTempNewPartyName(formData.partyName.trim());
+      setTempReceiptUrls(receiptUrls); // Store for prompt
       setIsNewPartyPromptOpen(true);
-      // Wait for user modal interaction (handled in UI)
     } else {
       submitTransaction(formData.partyName.trim());
     }
@@ -379,14 +380,6 @@ export default function App() {
     if (shouldSave) {
       await handleAddParty({ name: tempNewPartyName, type: modalType === 'income' ? 'customer' : 'supplier' });
     }
-    // Continue with transaction submission logic
-    const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
-    // Re-run the core submission (simplified version of submitTransaction logic for the modal)
-    // To avoid duplication, I'll move actual submission to a separate call or state.
-    // For now, let's just trigger the submission manually with the temp name.
-    const reader = new FileReader(); // This part is tricky because files were being uploaded. 
-    // Let's refactor handleFormSubmit to handle this better in the next step or keep it simple.
-    // Simpler approach: handleConfirmNewPartySave only saves the party, then calls a simplified submission.
     await finalizeSubmissionWithParty(tempNewPartyName);
   };
 
@@ -402,13 +395,14 @@ export default function App() {
       method: formData.paymentMethod,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       category: formData.category, 
-      receiptUrl: "", // Images would have been uploaded in the main handler or we skip for simplicity if prompt happens
+      receiptUrl: tempReceiptUrls, 
       business: formData.business,
       refjob: formData.refjob
     };
     setTransactions([newTx, ...transactions]);
     setIsModalOpen(false);
     setIsNewPartyPromptOpen(false);
+    setTempReceiptUrls('');
     if (isOnline) {
         try {
           await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addTransaction', payload: newTx }), redirect: 'follow' });
@@ -681,7 +675,57 @@ export default function App() {
                 </div>
              </div>
 
-             {/* Chart View */}
+             {/* Yearly Monthly Comparison Chart */}
+             <div className="bg-[#1D1B20] p-8 md:p-14 rounded-[48px] md:rounded-[64px] text-white shadow-2xl relative overflow-hidden group">
+                <div className="flex justify-between items-center mb-10">
+                   <div>
+                      <h3 className="text-2xl md:text-3xl font-black tracking-tighter uppercase">แนวโน้มรายปี (Yearly Trends)</h3>
+                      <p className="text-[10px] font-black opacity-40 uppercase tracking-widest mt-1">Monthly Comparison {new Date().getFullYear()}</p>
+                   </div>
+                   <div className="flex gap-4 text-[10px] font-black uppercase">
+                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#DDFD54]"></span>รายรับ</div>
+                      <div className="flex items-center gap-1.5"><span className="w-3 h-3 rounded-full bg-[#AE88F9]"></span>รายจ่าย</div>
+                   </div>
+                </div>
+                <div className="h-[250px] md:h-[350px] flex items-end justify-between gap-2 md:gap-4 border-b border-white/10 pb-4">
+                   {monthlyAnalysis.map((m, idx) => (
+                     <div key={idx} className="flex-1 flex flex-col items-center justify-end h-full gap-3 group">
+                        <div className="flex w-full items-end justify-center gap-1 h-full">
+                           <div className="w-full max-w-[15px] bg-[#DDFD54] rounded-t-sm transition-all duration-1000 group-hover:brightness-125" style={{ height: `${m.inPerc}%` }}></div>
+                           <div className="w-full max-w-[15px] bg-[#AE88F9] rounded-t-sm transition-all duration-1000 group-hover:brightness-125" style={{ height: `${m.outPerc}%` }}></div>
+                        </div>
+                        <span className="text-[8px] md:text-[10px] font-black opacity-30 group-hover:opacity-100 transition-opacity">{m.label}</span>
+                     </div>
+                   ))}
+                </div>
+             </div>
+
+             {/* Top Parties Aggregated Report */}
+             <div className="bg-white border-2 border-[#EAE3F4] p-8 md:p-14 rounded-[48px] md:rounded-[64px] shadow-sm">
+                <div className="flex justify-between items-center mb-10">
+                   <h3 className="text-2xl md:text-3xl font-black tracking-tighter uppercase">สรุปยอดตามรายชื่อคู่ค้า</h3>
+                   <div className="bg-[#F8F7FA] p-3 rounded-2xl"><Users size={24} className="text-[#AE88F9]" /></div>
+                </div>
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 md:gap-6">
+                   {partyAnalysis.map((pa, idx) => (
+                      <div key={idx} className="bg-[#F8F7FA] p-6 md:p-8 rounded-[40px] flex justify-between items-center group hover:bg-[#1D1B20] hover:text-white transition-all cursor-default">
+                         <div className="flex items-center gap-6">
+                            <span className="text-4xl font-black opacity-10 group-hover:opacity-30">#{(idx+1).toString().padStart(2, '0')}</span>
+                            <div>
+                               <p className="font-black text-lg md:text-2xl leading-none mb-1 uppercase tracking-tighter">{pa.name}</p>
+                               <p className="text-[9px] font-black opacity-40 uppercase tracking-widest">{pa.count} รายการล่าสุด</p>
+                            </div>
+                         </div>
+                         <div className="text-right">
+                           {pa.in > 0 && <p className="text-emerald-500 font-black text-sm md:text-xl">+{pa.in.toLocaleString()}</p>}
+                           {pa.out > 0 && <p className="text-[#AE88F9] font-black text-sm md:text-xl">-{pa.out.toLocaleString()}</p>}
+                         </div>
+                      </div>
+                   ))}
+                </div>
+             </div>
+
+             {/* Chart View (Existing distribution cards) */}
              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
                 <div className="lg:col-span-2 bg-white border-2 border-[#EAE3F4] p-8 md:p-10 rounded-[40px] shadow-sm h-[400px] flex flex-col">
                    <div className="flex justify-between items-center mb-8">
@@ -787,9 +831,133 @@ export default function App() {
                   </div>
                 ))}
              </div>
+
+             <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-4 bg-[#AE88F9] p-6 md:p-10 rounded-[32px] md:rounded-[48px] shadow-sm text-white mt-12">
+                <div className="flex items-center gap-4">
+                   <div className="bg-white/20 p-4 rounded-3xl"><Users size={32} /></div>
+                   <h2 className="text-2xl md:text-3xl font-black tracking-tighter leading-none">จัดการรายชื่อคู่ค้าประจำ<br/><span className="text-xs opacity-60 font-black uppercase tracking-widest leading-none">Master Data Management</span></h2>
+                </div>
+                <button onClick={() => { setSelectedParty(null); setIsAddPartyModalOpen(true); }} className="w-full sm:w-auto bg-white text-[#AE88F9] px-6 py-3.5 rounded-2xl font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all">เพิ่มรายชื่อใหม่</button>
+             </div>
+
+             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 mt-6">
+                {parties.map(p => {
+                  const pHistory = transactions.filter(t => t.party === p.name);
+                  const pIn = pHistory.filter(t => t.type === 'income').reduce((s,t) => s + (parseFloat(t.amount)||0), 0);
+                  const pOut = pHistory.filter(t => t.type === 'expense').reduce((s,t) => s + (parseFloat(t.amount)||0), 0);
+                  return (
+                    <div key={p.id} onClick={() => { setSelectedParty(p); setIsPartyHistoryOpen(true); }} className="bg-white p-6 rounded-[32px] border-2 border-[#EAE3F4] hover:border-[#AE88F9] transition-all cursor-pointer group shadow-sm">
+                       <div className="flex justify-between items-start mb-4">
+                          <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${p.type === 'customer' ? 'bg-emerald-50 text-emerald-500' : 'bg-[#AE88F9]/10 text-[#AE88F9]'}`}>{p.type === 'customer' ? 'ลูกค้า' : 'ร้านค้า'}</div>
+                          <button onClick={(e) => { e.stopPropagation(); if(confirm('ลบลูกค้านี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16}/></button>
+                       </div>
+                       <h4 className="font-black text-xl mb-1 truncate leading-tight uppercase tracking-tight">{p.name}</h4>
+                       <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-4">Activity: {pHistory.length} รายการ</p>
+                       <div className="flex justify-between border-t border-[#F8F7FA] pt-4">
+                          <div><p className="text-[8px] font-black opacity-40 uppercase">Income</p><p className="text-emerald-500 font-black text-sm">+{pIn.toLocaleString()}</p></div>
+                          <div className="text-right"><p className="text-[8px] font-black opacity-40 uppercase">Expense</p><p className="text-[#AE88F9] font-black text-sm">-{pOut.toLocaleString()}</p></div>
+                       </div>
+                    </div>
+                  );
+                })}
+                {parties.length === 0 && <div className="col-span-full py-12 text-center opacity-30 font-black uppercase text-xs">ยังไม่มีข้อมูลรายชื่อคู่ค้าประจำ</div>}
+             </div>
           </div>
         )}
       </main>
+
+      {/* New Party Save Prompt (Magic Confirmation) */}
+      {isNewPartyPromptOpen && (
+        <div className="fixed inset-0 z-[500] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+           <div className="bg-white p-8 rounded-[32px] w-full max-w-sm shadow-2xl text-center animate-in zoom-in-95 duration-200">
+              <div className="w-16 h-16 bg-[#AE88F9]/10 rounded-full flex items-center justify-center mb-6 mx-auto">
+                 <Sparkles size={32} className="text-[#AE88F9]" />
+              </div>
+              <h3 className="text-xl font-black mb-2 leading-none uppercase tracking-tighter">Save regular contact?</h3>
+              <p className="text-gray-500 font-medium text-sm mb-8">คุณพิมพ์ชื่อ <span className="text-[#1D1B20] font-black">"{tempNewPartyName}"</span> ใหม่<br/>ต้องการบันทึกเป็นคู่ค้าประจำหรือไม่คะ?</p>
+              <div className="grid grid-cols-2 gap-3">
+                 <button onClick={() => handleConfirmNewPartySave(false)} className="py-4 bg-[#F8F7FA] rounded-2xl font-black text-gray-400">ข้ามไปก่อน</button>
+                 <button onClick={() => handleConfirmNewPartySave(true)} className="py-4 bg-[#AE88F9] text-white rounded-2xl font-black shadow-lg shadow-[#AE88F9]/20">บันทึกเลย!</button>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Party History Full Timeline Modal */}
+      {isPartyHistoryOpen && selectedParty && (
+        <div className="fixed inset-0 z-[350] bg-white animate-in slide-in-from-right duration-500 flex flex-col">
+           <div className="p-6 md:p-14 border-b border-[#F8F7FA] flex justify-between items-center bg-[#F8F7FA]/50 backdrop-blur-md sticky top-0 z-50">
+              <div className="flex items-center gap-6">
+                 <div className="w-12 h-12 md:w-16 md:h-16 bg-[#AE88F9] text-white rounded-3xl flex items-center justify-center shadow-lg"><Users size={32} /></div>
+                 <div>
+                    <h2 className="text-xl md:text-5xl font-black tracking-tighter uppercase leading-none">{selectedParty.name}</h2>
+                    <p className="text-[10px] md:text-xs font-black text-[#AE88F9] uppercase tracking-widest mt-1">Master Data Profile</p>
+                 </div>
+              </div>
+              <button onClick={() => setIsPartyHistoryOpen(false)} className="bg-[#1D1B20] p-4 rounded-full text-white shadow-xl hover:rotate-90 transition-transform"><X size={24} /></button>
+           </div>
+           <div className="flex-1 overflow-y-auto p-4 md:p-14 custom-scrollbar bg-[#F8F7FA]/30">
+              <div className="max-w-5xl mx-auto space-y-12">
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div className="bg-white p-10 rounded-[48px] border-2 border-[#EAE3F4] text-center shadow-sm">
+                       <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Total Income (Receipts)</p>
+                       <h3 className="text-4xl md:text-6xl font-black tracking-tighter text-emerald-500">+{transactions.filter(t => t.party === selectedParty.name && t.type === 'income').reduce((s,t) => (s+(parseFloat(t.amount)||0)),0).toLocaleString()}</h3>
+                    </div>
+                    <div className="bg-white p-10 rounded-[48px] border-2 border-[#EAE3F4] text-center shadow-sm">
+                       <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-2">Total Expenses (Paid)</p>
+                       <h3 className="text-4xl md:text-6xl font-black tracking-tighter text-[#AE88F9]">-{transactions.filter(t => t.party === selectedParty.name && t.type === 'expense').reduce((s,t) => (s+(parseFloat(t.amount)||0)),0).toLocaleString()}</h3>
+                    </div>
+                 </div>
+                 <div className="space-y-4">
+                    <h4 className="text-xl font-black uppercase tracking-tighter pl-2">Transaction History</h4>
+                    <div className="space-y-3">
+                      {transactions.filter(t => t.party === selectedParty.name).sort((a,b) => new Date(b.date) - new Date(a.date)).map(tx => (
+                         <div key={tx.id} className="bg-white p-6 md:p-10 rounded-[40px] border-2 border-[#F2EFF5] hover:border-[#AE88F9]/30 transition-all flex justify-between items-center group">
+                            <div className="flex items-center gap-6">
+                               <div className={`w-12 h-12 rounded-2xl flex items-center justify-center font-black ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.type === 'income' ? <ArrowUpRight size={20}/> : <ArrowDownRight size={20}/>}</div>
+                               <div>
+                                  <p className="font-black text-lg md:text-2xl leading-none mb-1 uppercase tracking-tight">{tx.desc}</p>
+                                  <div className="flex items-center gap-2">
+                                     <span className="text-[10px] font-black bg-[#F8F7FA] px-2 py-1 rounded-md uppercase tracking-wider">{tx.business}</span>
+                                     <span className="text-[10px] font-black opacity-30 tracking-widest">{tx.date}</span>
+                                  </div>
+                               </div>
+                            </div>
+                            <div className="text-right">
+                               <p className={`text-xl md:text-3xl font-black tracking-tighter ${tx.type === 'income' ? 'text-emerald-500' : 'text-[#AE88F9]'}`}>{tx.type === 'income' ? '+' : '-'} {tx.amount.toLocaleString()}</p>
+                               <p className="text-[10px] font-black opacity-30">{tx.method.toUpperCase()}</p>
+                            </div>
+                         </div>
+                      ))}
+                    </div>
+                 </div>
+              </div>
+           </div>
+        </div>
+      )}
+
+      {/* Add/Edit Party Modal */}
+      {isAddPartyModalOpen && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
+           <div className="bg-white p-10 md:p-14 rounded-[48px] w-full max-w-lg shadow-2xl animate-in zoom-in-95 duration-200">
+              <h3 className="text-3xl font-black mb-8 leading-none uppercase tracking-tighter">Add regular contact</h3>
+              <div className="space-y-6">
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase opacity-40 ml-1">ชื่อลูกค้า หรือ ร้านค้า/คู่ค้า</label>
+                    <input type="text" autoFocus id="party-name-input" placeholder="พิมพ์ชื่อที่นี่..." className="w-full bg-[#F8F7FA] p-6 rounded-3xl outline-none font-black text-lg border-2 border-transparent focus:border-[#AE88F9] transition" />
+                 </div>
+                 <div className="space-y-2">
+                    <label className="text-[10px] font-black uppercase opacity-40 ml-1">เลือกประเภทข้อมูล</label>
+                    <div className="grid grid-cols-2 gap-3">
+                       <button onClick={() => { const name = document.getElementById('party-name-input').value; if (name) handleAddParty({ name, type: 'customer' }); }} className="py-5 bg-emerald-50 text-emerald-600 rounded-3xl font-black text-sm hover:scale-[1.02] shadow-sm">ลูกค้า</button>
+                       <button onClick={() => { const name = document.getElementById('party-name-input').value; if (name) handleAddParty({ name, type: 'supplier' }); }} className="py-5 bg-[#AE88F9]/10 text-[#AE88F9] rounded-3xl font-black text-sm hover:scale-[1.02] shadow-sm">ร้านค้า</button>
+                    </div>
+                 </div>
+                 <button onClick={() => setIsAddPartyModalOpen(false)} className="w-full py-4 text-gray-400 font-black text-xs uppercase tracking-widest">Cancel</button>
+              </div>
+           </div>
+        </div>
+      )}
 
       {/* Breakdown Detailed Modal */}
       {isBreakdownOpen && (
