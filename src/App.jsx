@@ -275,6 +275,35 @@ export default function App() {
     }
   };
 
+  const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
+  const [editingBusinessId, setEditingBusinessId] = useState('');
+  const [newCatInEdit, setNewCatInEdit] = useState({ type: 'income', name: '' });
+
+  const handleAddCategoryInEdit = async () => {
+    if (!newCatInEdit.name.trim()) return;
+    const catName = newCatInEdit.name.trim();
+    setCategories(prev => {
+      const bCats = prev[editingBusinessId] || { income: [], expense: [] };
+      return { ...prev, [editingBusinessId]: { ...bCats, [newCatInEdit.type]: [...bCats[newCatInEdit.type], catName] } };
+    });
+    setNewCatInEdit({ ...newCatInEdit, name: '' });
+    if (isOnline) {
+      await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addCategory', payload: { businessId: editingBusinessId, type: newCatInEdit.type, name: catName } }) });
+    }
+  };
+
+  const handleDeleteCategoryInEdit = (type, name) => {
+    if (window.confirm(`ลบหมวดหมู่ ${name}?`)) {
+      setCategories(prev => ({
+        ...prev,
+        [editingBusinessId]: {
+          ...prev[editingBusinessId],
+          [type]: prev[editingBusinessId][type].filter(c => c !== name)
+        }
+      }));
+    }
+  };
+
   const formatCurrency = (val) => `฿${(parseFloat(val) || 0).toLocaleString()}`;
   const getIcon = (name) => { const Icon = ICON_MAP[name] || Briefcase; return <Icon size={18} />; };
 
@@ -300,6 +329,26 @@ export default function App() {
           </div>
         </div>
       </nav>
+
+      {/* Mobile Menu Dropdown */}
+      {isMobileMenuOpen && (
+        <div className="lg:hidden fixed inset-0 z-[60] bg-[#1D1B20]/40 backdrop-blur-sm transition-opacity" onClick={() => setIsMobileMenuOpen(false)}>
+          <div className="absolute top-[90px] left-4 right-4 bg-white rounded-[32px] p-4 shadow-2xl border border-[#EAE3F4] flex flex-col gap-2 animate-in slide-in-from-top-8 duration-300" onClick={e => e.stopPropagation()}>
+            {[
+              { id: 'dashboard', label: 'หน้าแรก / ภาพรวม', icon: Home },
+              { id: 'reports', label: 'รายงานรายรับ-จ่าย', icon: PieChart },
+              { id: 'settings', label: 'ตั้งค่าระบบ', icon: Settings }
+            ].map(tab => (
+              <button key={tab.id} onClick={() => { setActiveTab(tab.id); setIsMobileMenuOpen(false); }} className={`flex items-center gap-4 font-black p-4 rounded-[24px] transition-all ${activeTab === tab.id ? 'bg-[#DDFD54] text-[#1D1B20] shadow-sm' : 'text-[#7A7585] hover:bg-[#F8F7FA]'}`}>
+                <tab.icon size={20} />
+                <span className="text-sm">{tab.label}</span>
+              </button>
+            ))}
+            <div className="h-px bg-[#F8F7FA] my-2"></div>
+            <p className="px-4 text-[10px] font-black text-[#7A7585] opacity-40 uppercase tracking-widest">WTR Agriculture LEDGER v3.0</p>
+          </div>
+        </div>
+      )}
 
       {/* Business Switcher Tab */}
       <div className="max-w-7xl mx-auto w-full px-4 md:px-8 mt-4 overflow-x-auto no-scrollbar flex gap-2 pb-2">
@@ -502,7 +551,7 @@ export default function App() {
                         <h4 className="font-black text-2xl tracking-tighter">{b.name}</h4>
                      </div>
                      <div className="space-y-4">
-                        <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
+                        <div className="flex justify-between items-center text-xs font-black opacity-50 uppercase tracking-widest"><span>หมวดหมู่รายการ</span> <button onClick={() => { setEditingBusinessId(b.id); setIsEditCategoryModalOpen(true); }} className="text-[#AE88F9] font-black">+ แก้ไข</button></div>
                         <div className="flex flex-wrap gap-2">
                            {categories[b.id]?.income.concat(categories[b.id]?.expense).slice(0, 4).map(c => <span key={c} className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black">{c}</span>)}
                            <span className="px-3 py-1.5 bg-[#F8F7FA] rounded-lg text-[9px] font-black opacity-40">...</span>
@@ -644,6 +693,56 @@ export default function App() {
                     </div>
                   ))}
               </div>
+           </div>
+        </div>
+      )}
+      {/* Category Edit Modal */}
+      {isEditCategoryModalOpen && (
+        <div className="fixed inset-0 z-[250] flex items-center justify-center p-4 bg-[#1D1B20]/60 backdrop-blur-md">
+           <div className="bg-white p-8 md:p-14 rounded-[48px] md:rounded-[64px] w-full max-w-2xl shadow-2xl animate-in zoom-in-95 duration-300 max-h-[90vh] flex flex-col">
+              <div className="flex justify-between items-center mb-8">
+                 <div>
+                    <h3 className="text-2xl md:text-4xl font-black tracking-tighter uppercase">จัดการหมวดหมู่</h3>
+                    <p className="text-xs font-black text-[#7A7585] mt-1">ธุรกิจ: {businesses.find(b => b.id === editingBusinessId)?.name}</p>
+                 </div>
+                 <button onClick={() => setIsEditCategoryModalOpen(false)} className="bg-[#F8F7FA] p-4 rounded-full text-[#1D1B20] hover:rotate-90 transition-transform"><X size={24} /></button>
+              </div>
+
+              <div className="flex-1 overflow-y-auto pr-2 custom-scrollbar space-y-10">
+                 {/* Add New Category Form */}
+                 <div className="bg-[#F8F7FA] p-8 rounded-[40px] space-y-4">
+                    <p className="text-[10px] font-black uppercase opacity-40 tracking-widest">เพิ่มหมวดหมู่ใหม่</p>
+                    <div className="flex gap-3">
+                       <select value={newCatInEdit.type} onChange={e => setNewCatInEdit({...newCatInEdit, type: e.target.value})} className="bg-white border-2 border-[#EAE3F4] px-4 py-3 rounded-2xl font-black text-xs outline-none focus:border-[#AE88F9]">
+                          <option value="income">รายรับ (+)</option>
+                          <option value="expense">รายจ่าย (-)</option>
+                       </select>
+                       <input type="text" value={newCatInEdit.name} onChange={e => setNewCatInEdit({...newCatInEdit, name: e.target.value})} placeholder="ชื่อหมวดหมู่..." className="flex-1 bg-white border-2 border-[#EAE3F4] px-5 py-3 rounded-2xl font-black text-sm outline-none focus:border-[#1D1B20]" />
+                       <button onClick={handleAddCategoryInEdit} className="bg-[#1D1B20] text-[#DDFD54] px-6 py-3 rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-transform"><Plus size={20}/></button>
+                    </div>
+                 </div>
+
+                 {/* List Categories */}
+                 <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
+                    {['income', 'expense'].map(type => (
+                       <div key={type} className="space-y-4">
+                          <h4 className={`font-black text-lg flex items-center gap-2 ${type === 'income' ? 'text-emerald-500' : 'text-[#AE88F9]'}`}>
+                             {type === 'income' ? <ArrowUpRight size={18}/> : <ArrowDownRight size={18}/>} หมวดหมู่{type === 'income' ? 'รายรับ' : 'รายจ่าย'}
+                          </h4>
+                          <div className="space-y-2">
+                             {(categories[editingBusinessId]?.[type] || []).map(cat => (
+                                <div key={cat} className="flex justify-between items-center p-4 bg-white border-2 border-[#F2EFF5] rounded-2xl group hover:border-[#1D1B20] transition-colors">
+                                   <span className="font-black text-sm">{cat}</span>
+                                   <button onClick={() => handleDeleteCategoryInEdit(type, cat)} className="text-rose-400 opacity-0 group-hover:opacity-100 p-2 hover:bg-rose-50 rounded-lg transition-all"><Trash2 size={16}/></button>
+                                </div>
+                             ))}
+                             {(categories[editingBusinessId]?.[type] || []).length === 0 && <p className="text-[10px] font-black opacity-30 text-center py-4">ไม่มีข้อมูล</p>}
+                          </div>
+                       </div>
+                    ))}
+                 </div>
+              </div>
+              <button onClick={() => setIsEditCategoryModalOpen(false)} className="mt-8 w-full py-5 bg-[#1D1B20] text-white rounded-[24px] font-black text-lg shadow-xl">บันทึกและปิดหน้าต่าง</button>
            </div>
         </div>
       )}
