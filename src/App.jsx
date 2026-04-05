@@ -323,7 +323,7 @@ export default function App() {
   const getIcon = (name) => { const Icon = ICON_MAP[name] || Briefcase; return <Icon size={18} />; };
 
   return (
-    <div className="min-h-screen bg-[#F8F7FA] text-[#1D1B20] font-sans flex flex-col selection:bg-[#DDFD54] selection:text-[#1D1B20]">
+    <div className="min-h-screen bg-[#F8F7FA] text-[#1D1B20] font-sans flex flex-col selection:bg-[#DDFD54] selection:text-[#1D1B20]" style={{ touchAction: 'manipulation' }}>
       <input type="file" multiple accept="image/*" capture="environment" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
 
       {/* Navbar */}
@@ -635,12 +635,12 @@ export default function App() {
                  </div>
 
                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm" /></div>
-                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">หมวดหมู่ ({formData.business})</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-sm appearance-none">{(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
+                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">วันที่ทำรายการ</label><input type="date" value={formData.date} onChange={e => setFormData({...formData, date: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-base" /></div>
+                    <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">หมวดหมู่ ({formData.business})</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-base appearance-none">{(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                  </div>
                  
-                 <input type="text" placeholder={modalType === 'income' ? 'รับจากลูกค้า...' : 'จ่ายให้ร้านค้า...'} value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-xs md:text-sm focus:border-black border-2 border-transparent transition" />
-                 <input type="text" placeholder="พิมพ์ชื่อรายการ..." value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-xs md:text-sm focus:border-black border-2 border-transparent transition" />
+                 <input type="text" placeholder={modalType === 'income' ? 'รับจากลูกค้า...' : 'จ่ายให้ร้านค้า...'} value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition" />
+                 <input type="text" placeholder="พิมพ์ชื่อรายการ..." value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition" />
                  
                  <div className="grid grid-cols-2 gap-3">
                     <button type="button" onClick={() => setFormData({...formData, paymentMethod: 'cash'})} className={`py-4 rounded-2xl font-black text-xs border-2 transition-all flex items-center justify-center gap-2 ${formData.paymentMethod === 'cash' ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white text-[#7A7585] border-[#EAE3F4]'}`}><Wallet size={16} /> เงินสด</button>
@@ -648,8 +648,8 @@ export default function App() {
                  </div>
 
                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">ราคา</label><input type="number" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-sm" /></div>
-                    <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">จำนวน</label><input type="number" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-sm" /></div>
+                    <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">ราคา</label><input type="number" value={formData.unitPrice} onChange={e => setFormData({...formData, unitPrice: e.target.value})} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-base" /></div>
+                    <div className="space-y-1.5"><label className="text-[9px] uppercase font-black opacity-40 ml-1">จำนวน</label><input type="number" value={formData.quantity} onChange={e => setFormData({...formData, quantity: e.target.value})} className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-base" /></div>
                  </div>
 
                  <div className="space-y-2">
@@ -676,7 +676,7 @@ export default function App() {
            <div className="bg-white p-8 md:p-10 rounded-[32px] md:rounded-[48px] w-full max-w-sm shadow-2xl animate-in zoom-in-95 duration-200">
               <h3 className="text-xl md:text-2xl font-black mb-6 uppercase tracking-tighter">เพิ่มธุรกิจใหม่</h3>
               <div className="space-y-6">
-                <input type="text" autoFocus value={newBusiness.name} onChange={e => setNewBusiness({...newBusiness, name: e.target.value})} placeholder="ชื่อธุรกิจ (เช่น สวน, ร้านค้า)..." className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-sm" />
+                <input type="text" autoFocus value={newBusiness.name} onChange={e => setNewBusiness({...newBusiness, name: e.target.value})} placeholder="ชื่อธุรกิจ (เช่น สวน, ร้านค้า)..." className="w-full bg-[#F8F7FA] p-5 rounded-2xl outline-none font-black text-base" />
                 <div className="grid grid-cols-3 gap-3">
                    {['Wrench', 'Leaf', 'ShoppingCart', 'Tractor', 'Factory', 'Briefcase'].map(icon => (
                       <button key={icon} onClick={() => setNewBusiness({...newBusiness, icon: icon})} className={`p-4 rounded-xl border-2 flex items-center justify-center transition-all ${newBusiness.icon === icon ? 'bg-[#1D1B20] text-[#DDFD54] border-[#1D1B20]' : 'bg-white border-[#EAE3F4] text-[#7A7585]'}`}>{getIcon(icon)}</button>
@@ -728,12 +728,12 @@ export default function App() {
                  <div className="bg-[#F8F7FA] p-5 md:p-8 rounded-[24px] md:rounded-[40px] space-y-3">
                     <p className="text-[9px] font-black uppercase opacity-40 tracking-widest">เพิ่มหมวดหมู่ใหม่</p>
                     <div className="flex flex-col sm:flex-row gap-2">
-                       <select value={newCatInEdit.type} onChange={e => setNewCatInEdit({...newCatInEdit, type: e.target.value})} className="bg-white border-2 border-[#EAE3F4] px-3 py-2.5 rounded-xl md:rounded-2xl font-black text-xs outline-none focus:border-[#AE88F9]">
+                       <select value={newCatInEdit.type} onChange={e => setNewCatInEdit({...newCatInEdit, type: e.target.value})} className="bg-white border-2 border-[#EAE3F4] px-3 py-2.5 rounded-xl md:rounded-2xl font-black text-base outline-none focus:border-[#AE88F9]">
                           <option value="income">รายรับ (+)</option>
                           <option value="expense">รายจ่าย (-)</option>
                        </select>
                        <div className="flex flex-1 gap-2">
-                          <input type="text" value={newCatInEdit.name} onChange={e => setNewCatInEdit({...newCatInEdit, name: e.target.value})} placeholder="ชื่อหมวดหมู่..." className="flex-1 bg-white border-2 border-[#EAE3F4] px-4 py-2.5 rounded-xl md:rounded-2xl font-black text-sm outline-none focus:border-[#1D1B20]" />
+                          <input type="text" value={newCatInEdit.name} onChange={e => setNewCatInEdit({...newCatInEdit, name: e.target.value})} placeholder="ชื่อหมวดหมู่..." className="flex-1 bg-white border-2 border-[#EAE3F4] px-4 py-2.5 rounded-xl md:rounded-2xl font-black text-base outline-none focus:border-[#1D1B20]" />
                           <button onClick={handleAddCategoryInEdit} className="bg-[#1D1B20] text-[#DDFD54] px-5 py-2.5 rounded-xl md:rounded-2xl font-black text-sm shadow-lg active:scale-95 transition-transform"><Plus size={18}/></button>
                        </div>
                     </div>
