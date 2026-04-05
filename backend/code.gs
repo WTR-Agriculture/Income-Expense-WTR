@@ -42,7 +42,7 @@ function getJsonData(sheetName) {
   // Auto-create sheets if they don't exist
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
-    if (sheetName === 'Transactions') sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'receiptUrl', 'business']);
+    if (sheetName === 'Transactions') sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'refjob', 'receiptUrl', 'business']);
     if (sheetName === 'Categories') sheet.appendRow(['businessId', 'type', 'name']);
     if (sheetName === 'Businesses') sheet.appendRow(['id', 'name', 'icon']);
   }
@@ -65,7 +65,7 @@ function addTransaction(payload) {
   let sheet = ss.getSheetByName('Transactions');
   if (!sheet) {
     sheet = ss.insertSheet('Transactions');
-    sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'receiptUrl', 'business']);
+    sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'refjob', 'receiptUrl', 'business']);
   }
   
   const headers = sheet.getDataRange().getValues()[0];

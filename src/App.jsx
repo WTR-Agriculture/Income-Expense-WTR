@@ -41,7 +41,8 @@ export default function App() {
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [isHistoryOpen, setIsHistoryOpen] = useState(false);
   const [reportPeriod, setReportPeriod] = useState('monthly');
-  
+  const [viewingReceipts, setViewingReceipts] = useState(null); // URL or array of URLs
+
   // Breakdown Modal State
   const [isBreakdownOpen, setIsBreakdownOpen] = useState(false);
   const [breakdownType, setBreakdownType] = useState('income');
@@ -97,6 +98,7 @@ export default function App() {
           ...t,
           amount: parseFloat(t.amount) || 0,
           business: t.business || 'garage',
+          receiptUrl: t.refjob || t.receiptUrl || '',
           date: t.date && t.date.toString().startsWith("1899") ? new Date().toISOString().split('T')[0] : (t.date ? t.date.toString().split('T')[0] : new Date().toISOString().split('T')[0])
         }));
         setTransactions(sanitized);
@@ -188,7 +190,8 @@ export default function App() {
   const [formData, setFormData] = useState({
     date: new Date().toISOString().split('T')[0],
     partyName: '', itemName: '', unitPrice: '', quantity: '1',
-    category: '', paymentMethod: 'cash', business: 'garage'
+    category: '', paymentMethod: 'cash', business: 'garage',
+    refjob: ''
   });
 
   const handleOpenModal = (type) => {
@@ -238,7 +241,8 @@ export default function App() {
       desc: formData.itemName || (modalType === 'income' ? 'รายรับ' : 'รายจ่าย'),
       amount: finalAmount, method: formData.paymentMethod,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-      category: formData.category, receiptUrl: receiptUrls, business: formData.business
+      category: formData.category, receiptUrl: receiptUrls, business: formData.business,
+      refjob: formData.refjob
     };
 
     setTransactions([newTx, ...transactions]);
@@ -324,7 +328,7 @@ export default function App() {
 
   return (
     <div className="min-h-screen bg-[#F8F7FA] text-[#1D1B20] font-sans flex flex-col selection:bg-[#DDFD54] selection:text-[#1D1B20]" style={{ touchAction: 'manipulation' }}>
-      <input type="file" multiple accept="image/*" capture="environment" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
+      <input type="file" multiple accept="image/*" ref={fileInputRef} onChange={handleImageSelect} className="hidden" />
 
       {/* Navbar */}
       <nav className="px-3 md:px-8 py-3 md:py-5 w-full sticky top-0 z-50 bg-[#F8F7FA]/90 backdrop-blur-md">
@@ -408,10 +412,15 @@ export default function App() {
                 <div className="p-6 md:p-10 border-b border-[#F8F7FA] flex justify-between items-center"><h3 className="font-black text-lg md:text-2xl tracking-tighter uppercase">รายการล่าสุด</h3><button onClick={() => setIsHistoryOpen(true)} className="text-[#AE88F9] font-black text-xs md:text-sm">ดูทั้งหมด</button></div>
                 <div className="flex-1 overflow-y-auto p-4 md:p-6 space-y-4 custom-scrollbar">
                    {filteredByBusiness.slice(0, 10).map(tx => (
-                     <div key={tx.id} className="flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] md:rounded-[32px] hover:bg-[#F2EFF5] transition-all group">
+                     <div key={tx.id} onClick={() => tx.receiptUrl && setViewingReceipts(tx.receiptUrl.split(', '))} className={`flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] md:rounded-[32px] hover:bg-[#F2EFF5] transition-all group ${tx.receiptUrl ? 'cursor-zoom-in active:scale-[0.98]' : ''}`}>
                         <div className="flex items-center gap-3 md:gap-4 min-w-0">
                            <div className={`w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />)}</div>
-                           <div className="truncate"><p className="font-black text-xs md:text-[15px] truncate text-[#1D1B20] leading-none mb-1">{tx.desc}</p><p className="text-[9px] md:text-[10px] font-black text-[#7A7585] uppercase tracking-tighter">{tx.party} • {tx.business.toUpperCase()}</p></div>
+                           <div className="truncate">
+                              <p className="font-black text-xs md:text-[15px] truncate text-[#1D1B20] leading-none mb-1">
+                                 {tx.desc} {tx.refjob && <span className="bg-[#1D1B20] text-[#DDFD54] text-[8px] px-1.5 py-0.5 rounded-md ml-1">{tx.refjob}</span>}
+                              </p>
+                              <p className="text-[9px] md:text-[10px] font-black text-[#7A7585] uppercase tracking-tighter">{tx.party} • {tx.business.toUpperCase()}</p>
+                           </div>
                         </div>
                         <p className={`font-black text-xs md:text-base tracking-tighter ${tx.type === 'income' ? 'text-[#1D1B20]' : 'text-[#AE88F9]'}`}>{formatCurrency(tx.amount)}</p>
                      </div>
@@ -530,7 +539,7 @@ export default function App() {
                 <div className="p-6 md:p-8 space-y-3 overflow-x-auto">
                    <div className="min-w-[600px] md:min-w-0 space-y-3">
                       {currentPeriodTransactions.slice(0, 10).map(tx => (
-                        <div key={tx.id} className="flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] hover:bg-[#F2EFF5] transition-all group">
+                        <div key={tx.id} onClick={() => tx.receiptUrl && setViewingReceipts(tx.receiptUrl.split(', '))} className={`flex items-center justify-between p-4 md:p-5 bg-[#F8F7FA] rounded-[24px] hover:bg-[#F2EFF5] transition-all group ${tx.receiptUrl ? 'cursor-zoom-in active:scale-[0.98]' : ''}`}>
                            <div className="flex items-center gap-4 min-w-0 flex-1">
                               <div className={`w-10 h-10 md:w-12 md:h-12 rounded-2xl flex items-center justify-center shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={18} /> : <ArrowDownRight size={18} />)}</div>
                               <div className="truncate"><h4 className="font-black text-[#1D1B20] text-sm md:text-base mb-1 truncate">{tx.desc}</h4><p className="text-[9px] md:text-xs font-black text-[#7A7585] uppercase truncate">{tx.party} • {tx.date} • {tx.business.toUpperCase()}</p></div>
@@ -639,7 +648,10 @@ export default function App() {
                     <div className="space-y-1.5 md:space-y-2"><label className="text-[9px] md:text-[10px] font-black uppercase opacity-40 ml-1">หมวดหมู่ ({formData.business})</label><select value={formData.category} onChange={e => setFormData({...formData, category: e.target.value})} className="w-full bg-[#F8F7FA] p-4 md:p-5 rounded-2xl md:rounded-3xl outline-none font-black text-base appearance-none">{(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}</select></div>
                  </div>
                  
-                 <input type="text" placeholder={modalType === 'income' ? 'รับจากลูกค้า...' : 'จ่ายให้ร้านค้า...'} value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition" />
+                 <div className="flex flex-col sm:flex-row gap-3">
+                    <input type="text" placeholder={modalType === 'income' ? 'รับจากลูกค้า...' : 'จ่ายให้ร้านค้า...'} value={formData.partyName} onChange={e => setFormData({...formData, partyName: e.target.value})} className="flex-1 bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition" />
+                    <input type="text" placeholder="เลขที่อ้างอิงเอกสาร (refjob)..." value={formData.refjob} onChange={e => setFormData({...formData, refjob: e.target.value})} className="flex-1 bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-[#AE88F9] border-2 border-dashed border-[#EAE3F4]" />
+                 </div>
                  <input type="text" placeholder="พิมพ์ชื่อรายการ..." value={formData.itemName} onChange={e => setFormData({...formData, itemName: e.target.value})} className="w-full bg-[#F8F7FA] p-5 md:p-6 rounded-2xl md:rounded-[24px] outline-none font-black text-base focus:border-black border-2 border-transparent transition" />
                  
                  <div className="grid grid-cols-2 gap-3">
@@ -699,7 +711,7 @@ export default function App() {
            <div className="flex-1 overflow-y-auto p-4 md:p-10 space-y-3">
               <div className="max-w-4xl mx-auto space-y-3">
                  {filteredByBusiness.map(tx => (
-                    <div key={tx.id} className="flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[32px] shadow-sm">
+                    <div key={tx.id} onClick={() => tx.receiptUrl && setViewingReceipts(tx.receiptUrl.split(', '))} className={`flex items-center justify-between p-5 md:p-6 bg-white border-2 border-[#F2EFF5] rounded-[32px] shadow-sm ${tx.receiptUrl ? 'cursor-zoom-in active:scale-[0.98]' : ''}`}>
                        <div className="flex items-center gap-4 md:gap-6 min-w-0">
                           <div className={`w-10 h-10 md:w-14 md:h-14 rounded-2xl flex items-center justify-center font-black shrink-0 ${tx.type === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>{tx.receiptUrl ? <ImageIcon size={20} /> : (tx.type === 'income' ? <ArrowUpRight size={20}/> : <ArrowDownRight size={20}/>)}</div>
                           <div className="truncate"><h4 className="font-black text-sm md:text-xl leading-none mb-1 truncate">{tx.desc}</h4><p className="text-[10px] uppercase font-extrabold text-[#7A7585] tracking-widest">{tx.date} • {tx.business} • {tx.party}</p></div>
@@ -760,6 +772,27 @@ export default function App() {
                  </div>
               </div>
               <button onClick={() => setIsEditCategoryModalOpen(false)} className="mt-6 w-full py-4 md:py-5 bg-[#1D1B20] text-white rounded-2xl md:rounded-[24px] font-black text-base md:text-lg shadow-xl">บันทึกและปิด</button>
+           </div>
+        </div>
+      )}
+
+      {/* ImageViewer Modal */}
+      {viewingReceipts && (
+        <div className="fixed inset-0 z-[300] bg-[#1D1B20] flex flex-col animate-in fade-in duration-300">
+           <div className="p-6 md:p-10 flex justify-between items-center text-white bg-[#1D1B20]/80 backdrop-blur-md sticky top-0 z-10">
+              <h2 className="text-2xl font-black tracking-tighter uppercase">ดูใบเสร็จ</h2>
+              <button onClick={() => setViewingReceipts(null)} className="p-3 md:p-4 rounded-full bg-white/10 hover:bg-white/20 transition-transform active:scale-95"><X size={24}/></button>
+           </div>
+           <div className="flex-1 overflow-y-auto p-4 md:p-10 custom-scrollbar">
+              <div className="max-w-4xl mx-auto grid grid-cols-1 md:grid-cols-2 gap-4">
+                 {viewingReceipts.map((url, idx) => (
+                    <div key={idx} className="relative group rounded-[32px] overflow-hidden bg-white/5 border border-white/10 shadow-2xl">
+                       <img src={url} alt={`Receipt ${idx+1}`} className="w-full h-auto object-cover min-h-[300px]" />
+                       <div className="absolute top-4 right-4"><a href={url} target="_blank" rel="noreferrer" className="bg-white/90 p-3 rounded-full text-[#1D1B20] shadow-lg flex items-center gap-2 font-black text-xs"><Download size={16}/> บันทึก</a></div>
+                    </div>
+                 ))}
+              </div>
+              {viewingReceipts.length === 0 && <div className="h-full flex items-center justify-center text-white/30 font-black uppercase tracking-widest text-4xl">No Images Found</div>}
            </div>
         </div>
       )}
