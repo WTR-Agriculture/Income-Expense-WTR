@@ -727,7 +727,7 @@ export default function App() {
 
       {/* Business Switcher Tab */}
       <div className="max-w-7xl mx-auto w-full px-4 md:px-8 mt-4 overflow-x-auto no-scrollbar flex gap-2 pb-2">
-        <button onClick={() => setActiveBusinessId('all')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === 'all' ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>ธุรกิจ WTR</button>
+        <button onClick={() => setActiveBusinessId('all')} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === 'all' ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>เครือ WTR</button>
         {businesses.map(b => (
           <button key={b.id} onClick={() => setActiveBusinessId(b.id)} className={`flex items-center gap-2 px-6 py-3 rounded-2xl font-black text-xs whitespace-nowrap transition-all ${activeBusinessId === b.id ? 'bg-[#1D1B20] text-[#DDFD54] shadow-lg' : 'bg-white border border-[#EAE3F4] text-[#7A7585]'}`}>{getIcon(b.icon)} {b.name}</button>
         ))}
@@ -999,16 +999,16 @@ export default function App() {
                 <button
                   onClick={() => setSettingsTab('businesses')}
                   className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${settingsTab === 'businesses'
-                      ? 'bg-[#1D1B20] text-[#DDFD54] shadow-md'
-                      : 'text-[#7A7585] hover:text-[#1D1B20]'
+                    ? 'bg-[#1D1B20] text-[#DDFD54] shadow-md'
+                    : 'text-[#7A7585] hover:text-[#1D1B20]'
                     }`}>
                   <Briefcase size={14} /> จัดการธุรกิจ
                 </button>
                 <button
                   onClick={() => setSettingsTab('parties')}
                   className={`flex-1 sm:flex-initial px-5 py-2.5 rounded-full font-black text-xs transition-all flex items-center justify-center gap-2 ${settingsTab === 'parties'
-                      ? 'bg-[#AE88F9] text-white shadow-md'
-                      : 'text-[#7A7585] hover:text-[#1D1B20]'
+                    ? 'bg-[#AE88F9] text-white shadow-md'
+                    : 'text-[#7A7585] hover:text-[#1D1B20]'
                     }`}>
                   <Users size={14} /> จัดการคู่ค้า
                 </button>
@@ -1184,8 +1184,8 @@ export default function App() {
                       disabled={isDupName || !newPartyInput.name.trim()}
                       onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'customer' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
                       className={`py-5 rounded-3xl font-black text-sm transition ${isDupName || !newPartyInput.name.trim()
-                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                          : 'bg-emerald-50 text-emerald-600 hover:scale-[1.02] shadow-sm'
+                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                        : 'bg-emerald-50 text-emerald-600 hover:scale-[1.02] shadow-sm'
                         }`}>
                       ลูกค้า
                     </button>
@@ -1193,8 +1193,8 @@ export default function App() {
                       disabled={isDupName || !newPartyInput.name.trim()}
                       onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'supplier' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
                       className={`py-5 rounded-3xl font-black text-sm transition ${isDupName || !newPartyInput.name.trim()
-                          ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
-                          : 'bg-[#AE88F9]/10 text-[#AE88F9] hover:scale-[1.02] shadow-sm'
+                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                        : 'bg-[#AE88F9]/10 text-[#AE88F9] hover:scale-[1.02] shadow-sm'
                         }`}>
                       ร้านค้า
                     </button>
