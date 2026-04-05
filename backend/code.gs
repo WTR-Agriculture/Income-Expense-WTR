@@ -128,15 +128,31 @@ function addBusiness(payload) {
   return createResponse({ status: 'success' });
 }
 
+function logDebug(msg) {
+  try {
+    const ss = SpreadsheetApp.getActiveSpreadsheet();
+    let sheet = ss.getSheetByName('DebugLog');
+    if (!sheet) sheet = ss.insertSheet('DebugLog');
+    sheet.appendRow([new Date(), msg]);
+  } catch(e) {}
+}
+
 function uploadFiles(payload) {
-  const FOLDER_ID = "17K8ZYLzylQx9vFZFQSWy5u1YeOlnwpzW"; 
+  logDebug('uploadFiles called. txId=' + payload.txId + ' files=' + (payload.files ? payload.files.length : 0));
+
   let folder;
   try {
-    folder = DriveApp.getFolderById(FOLDER_ID);
-  } catch (e) {
     const folders = DriveApp.getFoldersByName("WTR_Receipts");
-    if (folders.hasNext()) folder = folders.next();
-    else folder = DriveApp.createFolder("WTR_Receipts");
+    if (folders.hasNext()) {
+      folder = folders.next();
+      logDebug('Found folder: ' + folder.getName());
+    } else {
+      folder = DriveApp.createFolder("WTR_Receipts");
+      logDebug('Created new folder: WTR_Receipts');
+    }
+  } catch (folderErr) {
+    logDebug('Folder error: ' + folderErr.toString());
+    return createResponse({ status: 'error', message: folderErr.toString() });
   }
 
   const urls = [];
@@ -145,18 +161,22 @@ function uploadFiles(payload) {
       try {
         const fileName = (payload.txId || Date.now()) + "_" + file.name;
         const base64Data = file.base64.split(',')[1];
+        logDebug('Uploading: ' + fileName + ' base64len=' + (base64Data ? base64Data.length : 'null'));
         const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), file.type, fileName);
         const uploadedFile = folder.createFile(blob);
         uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-        urls.push(uploadedFile.getUrl());
-        console.log("Uploaded OK: " + fileName);
+        // แปลง URL เป็นรูปแบบที่ใช้ใน <img> ได้โดยตรง
+        const fileId = uploadedFile.getId();
+        const viewUrl = 'https://drive.google.com/uc?export=view&id=' + fileId;
+        urls.push(viewUrl);
+        logDebug('Upload OK: ' + viewUrl);
       } catch (err) {
-        console.error("Upload error: " + err.toString());
+        logDebug('Upload error: ' + err.toString());
       }
     });
   }
 
-  // ★ KEY FIX: อัปเดต receiptUrl ในชีทอัตโนมัติ ไม่ต้องรอ client
+  // อัปเดต receiptUrl ในชีทอัตโนมัติ
   if (urls.length > 0 && payload.txId) {
     try {
       const ss = SpreadsheetApp.getActiveSpreadsheet();
@@ -168,13 +188,15 @@ function uploadFiles(payload) {
       for (var i = 1; i < data.length; i++) {
         if (data[i][idCol].toString() === payload.txId.toString()) {
           sheet.getRange(i + 1, receiptCol + 1).setValue(urls.join(", "));
-          console.log("Updated receiptUrl for txId: " + payload.txId);
+          logDebug('Sheet updated receiptUrl for txId=' + payload.txId);
           break;
         }
       }
     } catch (sheetErr) {
-      console.error("Sheet update error: " + sheetErr.toString());
+      logDebug('Sheet update error: ' + sheetErr.toString());
     }
+  } else {
+    logDebug('No URLs to update. urls.length=' + urls.length);
   }
 
   return createResponse({ status: 'success', urls: urls });

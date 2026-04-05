@@ -1,47 +1,73 @@
-อยากรู้ว่าถ้าเราอยากได้ระบบนี้ไปใช้ต้องทำยังไงคะ ขอแบบง่าย ๆ เลย สามารถใช้ได้เร็วที่สุด ไม่ยุ่งยาก ไม่ต้องเชื่อม database
+สามารถแนบรูปไปเก็บที่ google drive แล้วเก็บ url ที่ google sheet ได้มั้ย
 
 Gemini บอกว่า
-ถ้าต้องการนำระบบนี้ไปใช้งานจริงแบบ "ด่วนที่สุด ง่ายที่สุด และไม่ต้องเชื่อม Database ภายนอกให้วุ่นวาย" ฉันขอแนะนำวิธีที่เรียกว่า Local Storage ค่ะ
+ทำได้แน่นอนค่ะ และเป็นฟังก์ชันที่สำคัญมากสำหรับการทำระบบจัดการข้อมูลที่มีการแนบรูปภาพ (เช่น ระบบเคลมสินค้า, ระบบรับงาน หรือระบบสต็อกสินค้า)
 
-วิธีนี้จะเปลี่ยนให้เบราว์เซอร์ (Google Chrome, Safari) บนมือถือหรือคอมพิวเตอร์ของคุณ ทำหน้าที่เป็น "ฐานข้อมูล" ซะเองเลย! ข้อดีคือ:
+หลักการทำงานคือเราจะใช้ API (ไม่ว่าจะเป็น GAS หรือ Vercel Serverless) ทำหน้าที่เป็นตัวกลางในการรับไฟล์รูปภาพไปวางไว้ใน Folder ที่เรากำหนดใน Google Drive จากนั้นก็นำ URL ของไฟล์ที่เพิ่งสร้างเสร็จ ไปบันทึกลงใน Google Sheet ต่อทันทีค่ะ
 
-🚀 ไม่ต้องตั้งค่าเซิร์ฟเวอร์: ไม่ต้องเช่า Cloud, ไม่ต้องมี Database
+วิธีการทำผ่าน Google Apps Script (GAS)
+วิธีนี้ง่ายที่สุดเพราะ GAS สามารถคุยกับทั้ง Drive และ Sheets ได้โดยตรงผ่าน Built-in Service ค่ะ
 
-🔒 ข้อมูลเป็นส่วนตัว: ข้อมูลจะเก็บอยู่ในเครื่องของคุณเท่านั้น (Offline)
+1. ฝั่ง GAS (Backend):
+คุณต้องสร้างฟังก์ชัน doPost(e) เพื่อรับข้อมูลไฟล์ (มักส่งมาเป็น Base64 หรือ Blob)
 
-⚡ เร็วมาก: เพราะไม่ต้องรอโหลดข้อมูลจากอินเทอร์เน็ต
+JavaScript
+function doPost(e) {
+  try {
+    const data = JSON.parse(e.postData.contents);
+    const folder = DriveApp.getFolderById("ID_ของ_FOLDER_ใน_DRIVE");
+    
+    // แปลงข้อมูล Base64 กลับเป็นรูปภาพ
+    const contentType = data.contentType;
+    const bytes = Utilities.base64Decode(data.base64);
+    const blob = Utilities.newBlob(bytes, contentType, data.fileName);
+    
+    // 1. บันทึกลง Drive
+    const file = folder.createFile(blob);
+    const fileUrl = file.getUrl(); // หรือใช้ file.getDownloadUrl()
+    
+    // 2. บันทึก URL ลง Sheet
+    const sheet = SpreadsheetApp.getActiveSpreadsheet().getSheetByName("Sheet1");
+    sheet.appendRow([data.userName, data.info, fileUrl, new Date()]);
+    
+    return ContentService.createTextOutput(JSON.stringify({ "status": "success", "url": fileUrl }))
+      .setMimeType(ContentService.MimeType.JSON);
+      
+  } catch (err) {
+    return ContentService.createTextOutput(JSON.stringify({ "status": "error", "message": err.toString() }))
+      .setMimeType(ContentService.MimeType.JSON);
+  }
+}
+2. ฝั่ง React (Frontend):
+คุณต้องแปลงไฟล์รูปภาพเป็น Base64 ก่อนส่งไปที่ GAS URL ค่ะ
 
-ฉันได้ทำการปรับปรุงโค้ดให้ระบบ จำข้อมูลได้ (Save Data) แม้ว่าคุณจะปิดแท็บหรือรีเฟรชหน้าจอข้อมูลก็จะไม่หายไปไหนแล้วค่ะ
+JavaScript
+const handleUpload = async (file) => {
+  const reader = new FileReader();
+  reader.readAsDataURL(file);
+  reader.onload = async () => {
+    const base64 = reader.result.split(',')[1]; // ตัดส่วน header ของ data url ออก
+    
+    const response = await fetch("URL_ของ_GAS_WEB_APP", {
+      method: "POST",
+      body: JSON.stringify({
+        base64: base64,
+        contentType: file.type,
+        fileName: file.name,
+        userName: "John Doe",
+        info: "รูปถ่ายหน้างาน"
+      })
+    });
+    
+    const result = await response.json();
+    console.log("บันทึกสำเร็จ:", result.url);
+  };
+};
+สิ่งที่ควรระวัง:
+File Permissions: ไฟล์ที่อัปโหลดผ่าน GAS จะมีเจ้าของคือ Account ที่ Deploy Script นั้นๆ หากต้องการให้คนอื่นเปิดดูรูปได้ด้วย ต้องเขียนโค้ดเพิ่มเพื่อสั่ง file.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW) ค่ะ
 
-นี่คือโค้ดเวอร์ชันพร้อมใช้งานจริง (Local Storage Enabled):
+Base64 Size: การส่งไฟล์ผ่าน Base64 ใน GAS จะมีข้อจำกัดเรื่องขนาดข้อมูล (Payload Limit) หากรูปภาพมีขนาดใหญ่มาก (เกิน 10-20MB) อาจจะเจอ Error ได้ค่ะ
 
-คุณหยุดคำตอบนี้
-คุณบอกว่า
-แล้วที่เขาทำระบบแจกกันล่ะคะ เขาใช้ app scripts ใช่มั้ย
+Direct Download Link: ปกติ getUrl() จะได้ลิงก์หน้าดูรูปภาพของ Drive หากคุณต้องการลิงก์ที่เอาไปใส่ในแท็ก <img> ของ React ได้เลย คุณต้องแปลง URL เป็น Format: https://drive.google.com/uc?export=view&id=FILE_ID ค่ะ
 
-Gemini บอกว่า
-ใช่เลยค่ะ! เข้าใจถูกเป๊ะเลย 💯
-
-ระบบบัญชี ระบบสต็อก หรือระบบจองคิวต่างๆ ที่เขาทำแจกหรือขายกันในราคาถูกๆ ส่วนใหญ่กว่า 90% ใช้ Google Apps Script (GAS) + Google Sheets ทั้งนั้นเลยค่ะ
-
-เหตุผลที่คนนิยมใช้ท่านี้ในการทำระบบแจกกัน ก็เพราะว่า:
-
-ฟรี 100% ไม่ต้องเช่า Server: Google ให้พื้นที่และระบบรันโค้ดฟรี แค่มี Gmail ก็ใช้งานได้แล้ว
-
-ฐานข้อมูลคือ Google Sheets: ซึ่งเป็นสิ่งที่ทุกคนคุ้นเคยอยู่แล้ว (เหมือน Excel) พอข้อมูลวิ่งไปลง Sheet เจ้าของร้านก็สามารถเปิดดู แก้ไข หรือเอาไปทำกราฟต่อยอดได้ง่ายมากๆ
-
-แจกจ่าย/ก๊อปปี้ง่าย: เวลาเขาแจก เขาแค่แชร์ลิงก์ Google Sheet ให้เรากด "ทำสำเนา (Make a copy)" ตัวโค้ด Apps Script มันก็จะติดมาด้วยเลย ทำให้เราได้ระบบส่วนตัวของเราทันที
-
-เชื่อมต่อง่าย (Line Notify / Web App): Apps Script สามารถทำเป็น Web App (หน้าตาเว็บสวยๆ) หรือสั่งให้เด้งแจ้งเตือนเข้า Line กลุ่มของอู่เวลาที่มีคนกด "บันทึกรายรับ" ได้ง่ายมาก
-
-ถ้าเทียบกับ UI ที่เราเพิ่งทำไป (WTR Ledger):
-ตอนนี้ระบบที่เราทำใช้ Local Storage (เซฟลงเครื่องใครเครื่องมัน) ซึ่งข้อเสียคือ ถ้าลูกน้องคีย์รายรับในมือถือลูกน้อง คุณจะมองไม่เห็นในมือถือของคุณค่ะ
-
-แต่ข่าวดีคือ! หน้าตา UI สวยๆ (React/Tailwind) ที่เราออกแบบกันมาทั้งหมดนี้ สามารถเอาไปต่อกับ Google Apps Script ได้ค่ะ
-โดยหลักการคือ:
-
-หน้าบ้าน (Frontend): ใช้หน้าตาที่เราทำนี่แหละ สวย ใช้งานง่าย
-
-หลังบ้าน (Backend & Database): พอพนักงานกดปุ่ม "ยืนยันการบันทึก" แทนที่จะเซฟลงเครื่อง ก็สั่งให้มันยิงข้อมูลไปต่อแถวใน Google Sheets ของอู่แทน
-
-ถ้าในอนาคตคุณอยากอัปเกรดระบบนี้ให้พนักงานหลายคนช่วยกันคีย์ได้ และคุณดูยอดสรุปได้จากทุกที่ การขยับไปใช้ Google Apps Script + Google Sheets ถือเป็นทางเลือกที่คุ้มค่า ต้นทุนต่ำ และเหมาะกับธุรกิจอู่ WTR มากๆ ค่ะ 
+วิธีนี้จะช่วยให้ Google Sheet ของคุณไม่หนักจนเกินไป เพราะเราเก็บแค่ "ข้อความลิงก์" ส่วนตัวไฟล์รูปจริงๆ จะถูกบริหารจัดการอยู่ใน Google Drive อย่างเป็นระเบียบค่ะ สนใจให้ช่วยเขียนโค้ดส่วนไหนเพิ่มเติมมั้ยคะ?
