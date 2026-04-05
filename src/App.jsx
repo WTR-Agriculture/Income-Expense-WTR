@@ -401,10 +401,11 @@ export default function App() {
       } catch (err) { console.error("Sheet sync failed:", err); }
     };
 
-    // ——— อัปโหลดรูปในพื้นหลัง (Background Upload) ———
+    // ——— อัปโหลดรูปในพื้นหลัง ———
     const uploadInBackground = async (tx) => {
-      // บันทึกข้อมูลลงชีทก่อน (ยังไม่มีรูป)
       await submitToSheet(tx);
+
+      console.log("imagesToUpload count:", imagesToUpload.length, "isOnline:", isOnline);
 
       if (!isOnline || imagesToUpload.length === 0) {
         setSyncStatus('success');
@@ -412,26 +413,19 @@ export default function App() {
         return;
       }
 
-      // ส่งรูปขึ้น Drive แบบ no-cors (fire-and-forget)
-      // เหตุผล: Google Apps Script redirect response ผ่าน echo URL ที่ไม่มี CORS header
-      // แต่ server ยังทำงานได้ปกติ รูปจะถูก upload อยู่ดี
-      try {
-        await fetch(API_URL, {
-          method: 'POST',
-          mode: 'no-cors',
-          body: JSON.stringify({
-            action: 'uploadFiles',
-            payload: {
-              txId: tx.id,
-              files: imagesToUpload.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 }))
-            }
-          })
-        });
-      } catch (err) {
-        console.warn("Upload request sent (no-cors):", err.message);
-      }
+      // ส่ง upload request แบบธรรมดา — Server จะประมวลผลก่อน CORS เกิดขึ้น
+      const body = JSON.stringify({
+        action: 'uploadFiles',
+        payload: {
+          txId: tx.id,
+          files: imagesToUpload.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 }))
+        }
+      });
+      console.log("Sending upload for txId:", tx.id, "payload size:", body.length, "bytes");
 
-      // รอ 8 วินาที แล้ว Sync กลับจาก Sheet เพื่อดึง receiptUrl ที่ Server บันทึกไว้
+      fetch(API_URL, { method: 'POST', body }).catch(() => {});
+
+      // รอ 15 วิ แล้ว Sync เพื่อดึง receiptUrl ที่ GAS บันทึกไว้อัตโนมัติ
       setTimeout(async () => {
         try {
           const res = await fetch(`${API_URL}?action=getTransactions`, { redirect: 'follow' });
@@ -440,16 +434,15 @@ export default function App() {
             const serverTx = data.find(t => t.id?.toString() === tx.id?.toString());
             if (serverTx?.receiptUrl) {
               setTransactions(prev => prev.map(t =>
-                t.id?.toString() === tx.id?.toString()
-                  ? { ...t, receiptUrl: serverTx.receiptUrl }
-                  : t
+                t.id?.toString() === tx.id?.toString() ? { ...t, receiptUrl: serverTx.receiptUrl } : t
               ));
+              console.log("Receipt URL synced:", serverTx.receiptUrl);
             }
           }
         } catch (e) { console.warn("Post-upload sync failed:", e); }
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 2000);
-      }, 8000);
+      }, 15000);
     };
 
     const submitTransaction = async (finalPartyName) => {
