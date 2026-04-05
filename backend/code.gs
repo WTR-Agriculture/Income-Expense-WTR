@@ -54,7 +54,20 @@ function getJsonData(sheetName) {
   const rows = data.slice(1);
   const result = rows.map(row => {
     let obj = {};
-    headers.forEach((h, i) => obj[h] = row[i]);
+    headers.forEach((h, i) => {
+      let val = row[i];
+      // แปลง Google Sheets Date object ให้เป็น string ที่อ่านได้
+      if (val instanceof Date) {
+        if (h === 'date') {
+          val = Utilities.formatDate(val, 'Asia/Bangkok', 'yyyy-MM-dd');
+        } else if (h === 'time') {
+          val = Utilities.formatDate(val, 'Asia/Bangkok', 'HH:mm');
+        } else {
+          val = val.toString();
+        }
+      }
+      obj[h] = val;
+    });
     return obj;
   });
   return createResponse(result.reverse());

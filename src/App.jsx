@@ -314,14 +314,45 @@ export default function App() {
     setIsModalOpen(true);
   };
 
+  // บีบอัดรูปก่อน upload — ลดจาก 5-10MB เหลือ ~200KB
+  const compressImage = (file) => {
+    return new Promise((resolve) => {
+      const canvas = document.createElement('canvas');
+      const ctx = canvas.getContext('2d');
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        const MAX = 1200;
+        let { width, height } = img;
+        if (width > MAX || height > MAX) {
+          if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
+          else { width = Math.round((width * MAX) / height); height = MAX; }
+        }
+        canvas.width = width;
+        canvas.height = height;
+        ctx.drawImage(img, 0, 0, width, height);
+        const compressed = canvas.toDataURL('image/jpeg', 0.72);
+        URL.revokeObjectURL(url);
+        resolve(compressed);
+      };
+      img.onerror = () => { URL.revokeObjectURL(url); resolve(null); };
+      img.src = url;
+    });
+  };
+
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
-    files.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setSelectedImages(prev => [...prev, { id: Math.random().toString(36).substr(2, 9), file: file, preview: URL.createObjectURL(file), base64: reader.result }]);
-      };
-      reader.readAsDataURL(file);
+    files.forEach(async (file) => {
+      const preview = URL.createObjectURL(file);
+      const compressed = await compressImage(file);
+      if (compressed) {
+        setSelectedImages(prev => [...prev, {
+          id: Math.random().toString(36).substr(2, 9),
+          file: { name: file.name.replace(/\.[^.]+$/, '.jpg'), type: 'image/jpeg' },
+          preview,
+          base64: compressed
+        }]);
+      }
     });
   };
 
