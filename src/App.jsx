@@ -1028,7 +1028,7 @@ export default function App() {
 
       {/* Entry Modal */}
       {isModalOpen && (
-        <div className="fixed inset-0 z-[100] flex items-end md:items-center justify-center p-2 md:p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
+        <div className="fixed inset-0 z-[750] flex items-end md:items-center justify-center p-2 md:p-4 bg-[#1D1B20]/60 backdrop-blur-sm animate-in fade-in duration-300">
           <div className="bg-white w-full max-w-xl rounded-t-[32px] md:rounded-[64px] shadow-2xl overflow-hidden flex flex-col animate-in slide-in-from-bottom-8 duration-500 max-h-[90vh]">
             <div className={`p-6 md:p-14 flex justify-between items-center ${modalType === 'income' ? 'bg-[#DDFD54]' : 'bg-[#AE88F9] text-white'}`}>
               <h2 className="text-2xl md:text-4xl font-black uppercase tracking-tighter leading-none">บันทึกรายการใหม่<br /><span className="text-sm md:text-2xl opacity-60">ระบุ{modalType === 'income' ? 'รายรับ' : 'รายจ่าย'}</span></h2>
@@ -1301,8 +1301,8 @@ export default function App() {
 
               {/* Action Buttons */}
               <div className="grid grid-cols-2 gap-3 pt-6">
-                <button onClick={() => { setIsDetailModalOpen(false); setTimeout(() => handleEditClick(selectedDetailTx), 100); }} className="py-3.5 bg-white border-2 border-[#1D1B20] text-[#1D1B20] rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#F8F7FA] transition-all shadow-sm active:scale-95"><Pencil size={18} /> แก้ไขข้อมูล</button>
-                <button onClick={() => { setTxToDelete(selectedDetailTx); setIsDeleteModalOpen(true); }} className="py-3.5 bg-rose-50 text-rose-600 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-rose-100 transition-all shadow-sm active:scale-95"><Trash2 size={18} /> ลบรายการนี้</button>
+                <button onClick={(e) => { e.stopPropagation(); handleEditClick(selectedDetailTx); setTimeout(() => setIsDetailModalOpen(false), 50); }} className="py-3.5 bg-white border-2 border-[#1D1B20] text-[#1D1B20] rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-[#F8F7FA] transition-all shadow-sm active:scale-95"><Pencil size={18} /> แก้ไขข้อมูล</button>
+                <button onClick={(e) => { e.stopPropagation(); setTxToDelete(selectedDetailTx); setIsDeleteModalOpen(true); }} className="py-3.5 bg-rose-50 text-rose-600 rounded-2xl font-black text-sm flex items-center justify-center gap-2 hover:bg-rose-100 transition-all shadow-sm active:scale-95"><Trash2 size={18} /> ลบรายการนี้</button>
               </div>
             </div>
           </div>
