@@ -58,6 +58,8 @@ export default function App() {
   const [isOnline, setIsOnline] = useState(navigator.onLine);
   const [searchTerm, setSearchTerm] = useState('');
   const [settingsTab, setSettingsTab] = useState('businesses'); // 'businesses' | 'parties'
+  const [deferredPrompt, setDeferredPrompt] = useState(null);
+  const [showInstallBanner, setShowInstallBanner] = useState(false);
 
   // File Upload State
   const [selectedImages, setSelectedImages] = useState([]);
@@ -107,11 +109,44 @@ export default function App() {
     const updateOnlineStatus = () => setIsOnline(navigator.onLine);
     window.addEventListener('online', updateOnlineStatus);
     window.addEventListener('offline', updateOnlineStatus);
+    
+    // PWA Install Prompt Listener
+    const handleBeforeInstallPrompt = (e) => {
+      e.preventDefault();
+      setDeferredPrompt(e);
+      setShowInstallBanner(true);
+    };
+
+    // Check if already in standalone mode
+    const isStandalone = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone;
+    if (!isStandalone) {
+      window.addEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
+      // For iOS where beforeinstallprompt isn't supported, show banner anyway (or after a delay)
+      const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent) && !window.MSStream;
+      if (isIOS) setShowInstallBanner(true);
+    }
+
     return () => {
       window.removeEventListener('online', updateOnlineStatus);
       window.removeEventListener('offline', updateOnlineStatus);
+      window.removeEventListener('beforeinstallprompt', handleBeforeInstallPrompt);
     };
   }, []);
+
+  const handleInstallClick = async () => {
+    if (!deferredPrompt) {
+      // Logic for iOS (Manual instruction)
+      alert('สำหรับ iPhone: ให้กดปุ่ม "แชร์" แล้วเลือก "เพิ่มไปยังหน้าจอโฮม" (Add to Home Screen) นะคะ 😊');
+      setShowInstallBanner(false);
+      return;
+    }
+    deferredPrompt.prompt();
+    const { outcome } = await deferredPrompt.userChoice;
+    if (outcome === 'accepted') {
+      setDeferredPrompt(null);
+      setShowInstallBanner(false);
+    }
+  };
 
   const syncWithGoogleSheets = useCallback(async () => {
     if (!isOnline) return;
@@ -708,6 +743,29 @@ export default function App() {
             ))}
             <div className="h-px bg-[#F8F7FA] my-2"></div>
             <p className="px-4 text-[10px] font-black text-[#7A7585] opacity-40 uppercase tracking-widest">WTR Agriculture LEDGER v3.0</p>
+          </div>
+        </div>
+      )}
+
+      {/* PWA Install Banner */}
+      {showInstallBanner && (
+        <div className="max-w-7xl mx-auto w-full px-4 md:px-8 mt-4 animate-in slide-in-from-top duration-700">
+          <div className="bg-white border-2 border-[#EAE3F4] p-3 md:p-4 rounded-[32px] shadow-lg flex items-center justify-between gap-4 group">
+            <div className="flex items-center gap-3 md:gap-4 overflow-hidden">
+              <div className="w-12 h-12 md:w-16 md:h-16 rounded-2xl md:rounded-3xl overflow-hidden shrink-0 shadow-md">
+                <img src="/icon-192.png" alt="App Icon" className="w-full h-full object-cover" />
+              </div>
+              <div className="min-w-0">
+                <h4 className="font-black text-[#1D1B20] text-sm md:text-lg leading-tight truncate uppercase tracking-tighter">Add WTR to Home Screen</h4>
+                <p className="text-[10px] md:text-xs font-black text-[#7A7585] opacity-60 truncate uppercase tracking-widest">บันทึกรายรับ รายจ่าย เครือ WTR</p>
+              </div>
+            </div>
+            <button 
+              onClick={handleInstallClick}
+              className="bg-[#DDFD54] text-[#1D1B20] px-6 md:px-10 py-3 md:py-4 rounded-2xl md:rounded-[24px] font-black text-xs md:text-sm shadow-xl active:scale-95 transition-all whitespace-nowrap">
+              ADD
+            </button>
+            <button onClick={() => setShowInstallBanner(false)} className="md:hidden p-2 text-[#7A7585] opacity-20"><X size={16} /></button>
           </div>
         </div>
       )}
