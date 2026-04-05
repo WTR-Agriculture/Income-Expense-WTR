@@ -17,7 +17,7 @@ const STORAGE_KEYS = {
   BUSINESSES: 'wtr_ledger_businesses'
 };
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbxF8UafxvgTgEvW80v-p9OJcAAurVh9BhFlXK06eXDM9v2hCzuJ_QA6aPI3uc7QOWEboA/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbyowsXXUW-Of0uZWcfNasjvH84i4ZhdgLu1YQdseL_JRvAmorh0RuMSrebDMZVR65UjEg/exec';
 
 const DEFAULT_BUSINESSES = [
   { id: 'garage', name: 'อู่', icon: 'Wrench' }
@@ -335,20 +335,36 @@ export default function App() {
 
     if (isOnline && selectedImages.length > 0) {
       try {
+        // Timeout 15 วินาที — ถ้าเกินเวลาจะบันทึกข้อมูลต่อโดยไม่มีรูป
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 15000);
+        
         const uploadRes = await fetch(API_URL, {
           method: 'POST',
-          body: JSON.stringify({ action: 'uploadFiles', payload: { txId: Date.now(), files: selectedImages.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 })) } }),
+          signal: controller.signal,
+          body: JSON.stringify({ 
+            action: 'uploadFiles', 
+            payload: { 
+              txId: Date.now(), 
+              files: selectedImages.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 })) 
+            } 
+          }),
           redirect: 'follow'
         });
+        clearTimeout(timeoutId);
+        
         const uploadData = await uploadRes.json();
-        if (uploadData.status === 'success' && uploadData.urls.length > 0) {
+        if (uploadData.status === 'success' && uploadData.urls && uploadData.urls.length > 0) {
           receiptUrls = uploadData.urls.join(", ");
         } else {
-          alert("คำเตือน: อัพโหลดรูปไม่สำเร็จ ข้อมูลจะถูกบันทึกโดยไม่มีรูป");
+          console.warn("Upload returned no URLs:", uploadData);
         }
       } catch (err) { 
-        alert("เกิดข้อผิดพลาดในการเชื่อมต่อเพื่ออัพโหลดรูป");
-        console.error("Upload failed", err); 
+        if (err.name === 'AbortError') {
+          console.warn("Upload timed out after 15s — saving without image");
+        } else {
+          console.error("Upload failed:", err); 
+        }
       }
     }
 
