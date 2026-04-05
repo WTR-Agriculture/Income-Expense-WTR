@@ -129,14 +129,11 @@ function addBusiness(payload) {
 }
 
 function uploadFiles(payload) {
-  // ใส่ Folder ID ที่แน่นอนที่พี่สาวสร้างไว้ เพื่อความชัวร์ (จากรูปของพี่สาว)
   const FOLDER_ID = "17K8ZYLzylQx9vFZFQSWy5u1YeOlnwpzW"; 
   let folder;
-  
   try {
     folder = DriveApp.getFolderById(FOLDER_ID);
   } catch (e) {
-    // ถ้าหาจาก ID ไม่เจอจริงๆ (เช่น ID ผิด) ให้หาจากชื่อแทน
     const folders = DriveApp.getFoldersByName("WTR_Receipts");
     if (folders.hasNext()) folder = folders.next();
     else folder = DriveApp.createFolder("WTR_Receipts");
@@ -144,22 +141,40 @@ function uploadFiles(payload) {
 
   const urls = [];
   if (payload.files && payload.files.length > 0) {
-    payload.files.forEach(file => {
+    payload.files.forEach(function(file) {
       try {
         const fileName = (payload.txId || Date.now()) + "_" + file.name;
         const base64Data = file.base64.split(',')[1];
         const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), file.type, fileName);
         const uploadedFile = folder.createFile(blob);
-        
-        // แชร์รูปแบบสาธารณะเพื่อให้แอพแสดงผลได้
         uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
         urls.push(uploadedFile.getUrl());
-        
-        console.log("Uploaded: " + fileName);
+        console.log("Uploaded OK: " + fileName);
       } catch (err) {
-        console.error("Single file upload error: " + err.toString());
+        console.error("Upload error: " + err.toString());
       }
     });
+  }
+
+  // ★ KEY FIX: อัปเดต receiptUrl ในชีทอัตโนมัติ ไม่ต้องรอ client
+  if (urls.length > 0 && payload.txId) {
+    try {
+      const ss = SpreadsheetApp.getActiveSpreadsheet();
+      const sheet = ss.getSheetByName('Transactions');
+      const data = sheet.getDataRange().getValues();
+      const headers = data[0];
+      const idCol = headers.indexOf('id');
+      const receiptCol = headers.indexOf('receiptUrl');
+      for (var i = 1; i < data.length; i++) {
+        if (data[i][idCol].toString() === payload.txId.toString()) {
+          sheet.getRange(i + 1, receiptCol + 1).setValue(urls.join(", "));
+          console.log("Updated receiptUrl for txId: " + payload.txId);
+          break;
+        }
+      }
+    } catch (sheetErr) {
+      console.error("Sheet update error: " + sheetErr.toString());
+    }
   }
 
   return createResponse({ status: 'success', urls: urls });
