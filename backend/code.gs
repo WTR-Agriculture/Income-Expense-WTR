@@ -83,7 +83,7 @@ function getJsonData(sheetName) {
   
   if (!sheet) {
     sheet = ss.insertSheet(sheetName);
-    if (sheetName === 'Transactions') sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'refjob', 'receiptUrl', 'business']);
+    if (sheetName === 'Transactions') sheet.appendRow(['id', 'type', 'date', 'party', 'desc', 'amount', 'method', 'time', 'category', 'refjob', 'receiptUrl', 'business', 'batchId']);
     if (sheetName === 'Categories') sheet.appendRow(['businessId', 'type', 'name']);
     if (sheetName === 'Businesses') sheet.appendRow(['id', 'name', 'icon']);
     if (sheetName === 'Parties') sheet.appendRow(['id', 'name', 'type', 'note']);

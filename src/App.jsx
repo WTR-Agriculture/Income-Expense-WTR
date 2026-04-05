@@ -427,7 +427,8 @@ export default function App() {
         : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       business: formData.business,
       refjob: formData.refjob,
-      receiptUrl: isEditMode ? transactions.find(t => t.id === editingTxId)?.receiptUrl || "" : "" 
+      receiptUrl: isEditMode ? transactions.find(t => t.id === editingTxId)?.receiptUrl || "" : "",
+      batchId: isEditMode ? transactions.find(t => t.id === editingTxId)?.batchId || batchId : batchId
     };
 
     const newTransactions = formData.items.map((it, idx) => ({
