@@ -330,87 +330,109 @@ export default function App() {
     const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
     if (finalAmount <= 0) return;
 
-    setSyncStatus('syncing');
-    let receiptUrls = "";
+    // สร้าง transaction ทันทีโดยไม่รอรูป
+    const txId = isEditMode ? editingTxId : Date.now();
+    const newTx = {
+      id: txId,
+      type: modalType,
+      date: formData.date,
+      party: formData.partyName || 'ทั่วไป',
+      desc: formData.itemName || (modalType === 'income' ? 'รายรับ' : 'รายจ่าย'),
+      amount: finalAmount,
+      method: formData.paymentMethod,
+      time: isEditMode
+        ? transactions.find(t => t.id === editingTxId)?.time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' })
+        : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
+      category: formData.category,
+      receiptUrl: isEditMode ? transactions.find(t => t.id === editingTxId)?.receiptUrl || "" : "",
+      business: formData.business,
+      refjob: formData.refjob
+    };
 
-    if (isOnline && selectedImages.length > 0) {
+    // บันทึกลง state ทันที → ปิด modal ทันที
+    if (isEditMode) {
+      setTransactions(prev => prev.map(t => t.id === txId ? newTx : t));
+    } else {
+      setTransactions(prev => [newTx, ...prev]);
+    }
+    setIsModalOpen(false);
+    setIsEditMode(false);
+    setEditingTxId(null);
+    const imagesToUpload = [...selectedImages];
+    setSelectedImages([]);
+    setSyncStatus('syncing');
+
+    // ——— ส่งข้อมูลขึ้น Google Sheets ก่อน (ไม่มีรูป) ———
+    const submitToSheet = async (tx) => {
       try {
-        // Timeout 15 วินาที — ถ้าเกินเวลาจะบันทึกข้อมูลต่อโดยไม่มีรูป
+        const action = isEditMode ? 'updateTransaction' : 'addTransaction';
+        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, payload: tx }), redirect: 'follow' });
+      } catch (err) { console.error("Sheet sync failed:", err); }
+    };
+
+    // ——— อัปโหลดรูปในพื้นหลัง (Background Upload) ———
+    const uploadInBackground = async (tx) => {
+      if (!isOnline || imagesToUpload.length === 0) {
+        await submitToSheet(tx);
+        setSyncStatus('success');
+        setTimeout(() => setSyncStatus('idle'), 2000);
+        return;
+      }
+
+      // บันทึกข้อมูลลงชีทก่อน (ยังไม่มีรูป)
+      await submitToSheet(tx);
+
+      // ส่งรูปขึ้น Drive
+      try {
         const controller = new AbortController();
-        const timeoutId = setTimeout(() => controller.abort(), 15000);
-        
+        const timeoutId = setTimeout(() => controller.abort(), 30000);
+
         const uploadRes = await fetch(API_URL, {
           method: 'POST',
           signal: controller.signal,
-          body: JSON.stringify({ 
-            action: 'uploadFiles', 
-            payload: { 
-              txId: Date.now(), 
-              files: selectedImages.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 })) 
-            } 
+          body: JSON.stringify({
+            action: 'uploadFiles',
+            payload: {
+              txId: tx.id,
+              files: imagesToUpload.map(img => ({ name: img.file.name, type: img.file.type, base64: img.base64 }))
+            }
           }),
           redirect: 'follow'
         });
         clearTimeout(timeoutId);
-        
+
         const uploadData = await uploadRes.json();
-        if (uploadData.status === 'success' && uploadData.urls && uploadData.urls.length > 0) {
-          receiptUrls = uploadData.urls.join(", ");
-        } else {
-          console.warn("Upload returned no URLs:", uploadData);
+        if (uploadData.status === 'success' && uploadData.urls?.length > 0) {
+          const receiptUrls = uploadData.urls.join(", ");
+          const updatedTx = { ...tx, receiptUrl: receiptUrls };
+          // อัปเดต state ใน app
+          setTransactions(prev => prev.map(t => t.id === tx.id ? updatedTx : t));
+          // อัปเดตชีทด้วย
+          await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateTransaction', payload: updatedTx }), redirect: 'follow' });
         }
-      } catch (err) { 
-        if (err.name === 'AbortError') {
-          console.warn("Upload timed out after 15s — saving without image");
-        } else {
-          console.error("Upload failed:", err); 
-        }
+      } catch (err) {
+        if (err.name !== 'AbortError') console.error("Background upload failed:", err);
       }
-    }
+
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('idle'), 2000);
+    };
 
     const submitTransaction = async (finalPartyName) => {
-      const newTx = {
-        id: isEditMode ? editingTxId : Date.now(),
-        type: modalType,
-        date: formData.date,
-        party: finalPartyName || formData.partyName || 'ทั่วไป',
-        desc: formData.itemName || (modalType === 'income' ? 'รายรับ' : 'รายจ่าย'),
-        amount: finalAmount,
-        method: formData.paymentMethod,
-        time: isEditMode ? transactions.find(t => t.id === editingTxId)?.time || new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }) : new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
-        category: formData.category,
-        receiptUrl: receiptUrls || (isEditMode ? transactions.find(t => t.id === editingTxId)?.receiptUrl || "" : ""),
-        business: formData.business,
-        refjob: formData.refjob
-      };
-
-      if (isEditMode) {
-        setTransactions(transactions.map(t => t.id === editingTxId ? newTx : t));
-      } else {
-        setTransactions([newTx, ...transactions]);
-      }
-
-      setIsModalOpen(false);
-      setIsEditMode(false);
-      setEditingTxId(null);
+      const finalTx = { ...newTx, party: finalPartyName || newTx.party };
       setIsNewPartyPromptOpen(false);
-
-      if (isOnline) {
-        try {
-          const action = isEditMode ? 'updateTransaction' : 'addTransaction';
-          await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action, payload: newTx }), redirect: 'follow' });
-          setSyncStatus('success');
-          setTimeout(() => setSyncStatus('idle'), 3000);
-        } catch (error) { setSyncStatus('error'); }
-      }
+      uploadInBackground(finalTx); // ไม่รอ (no await)
     };
 
     // Check for NEW PARTY
     const partyExists = parties.some(p => p.name.trim().toLowerCase() === formData.partyName.trim().toLowerCase());
     if (!partyExists && formData.partyName.trim() !== '' && formData.partyName.trim() !== 'ทั่วไป' && !isEditMode) {
       setTempNewPartyName(formData.partyName.trim());
-      setTempReceiptUrls(receiptUrls); // Store for prompt
+      setTempReceiptUrls('');
       setIsNewPartyPromptOpen(true);
+      // เก็บ pending tx ไว้ใช้ตอน confirm
+      window._pendingTx = newTx;
+      window._pendingImages = imagesToUpload;
     } else {
       submitTransaction(formData.partyName.trim());
     }
