@@ -142,18 +142,24 @@ function updateTransaction(payload) {
 }
 
 function updateTransactionsBatchReceiptUrl(payload) {
+  const { ids, url } = payload;
+  if (!ids || !url) return createResponse({ status: 'error', message: 'Missing ids or url' });
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Transactions');
   const data = sheet.getDataRange().getValues();
   const headers = data[0];
   const idCol = headers.indexOf('id');
   const receiptCol = headers.indexOf('receiptUrl');
-  const idsStrs = payload.ids.map(id => id.toString());
   
+  const idSet = new Set(ids.map(id => id.toString()));
+  let count = 0;
   for (let i = 1; i < data.length; i++) {
+    if (idSet.has(data[i][idCol].toString())) {
+      sheet.getRange(i + 1, receiptCol + 1).setValue(url);
+      count++;
     }
   }
-  return createResponse({ status: 'success' });
+  return createResponse({ status: 'success', updated: count });
 }
 
 function deleteTransaction(id) {
