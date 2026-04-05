@@ -393,7 +393,7 @@ export default function App() {
     setSelectedImages([]);
     setSyncStatus('syncing');
 
-    // ——— ส่งข้อมูลขึ้น Google Sheets ก่อน (ไม่มีรูป) ———
+    // ——— ส่งข้อมูล (ไม่มีรูป) ขึ้น Google Sheets ก่อน ———
     const submitToSheet = async (tx) => {
       try {
         const action = isEditMode ? 'updateTransaction' : 'addTransaction';
@@ -401,7 +401,11 @@ export default function App() {
       } catch (err) { console.error("Sheet sync failed:", err); }
     };
 
-    // ——— อัปโหลดรูปในพื้นหลัง ———
+    // ——— Cloudinary Config ———
+    const CLOUDINARY_CLOUD = 'djrwxouxx';
+    const CLOUDINARY_PRESET = 'wtr_receipts';
+
+    // ——— อัปโหลดรูปผ่าน Cloudinary แล้วอัปเดต Sheet ———
     const uploadInBackground = async (tx) => {
       await submitToSheet(tx);
 
@@ -413,42 +417,53 @@ export default function App() {
         return;
       }
 
-      // ส่งทีละไฟล์ — base64 เป็น body ตรงๆ (text/plain), metadata ใน URL params
+      const urls = [];
       for (const img of imagesToUpload) {
-        const base64 = img.base64.includes(',') ? img.base64.split(',')[1] : img.base64;
-        const params = new URLSearchParams({
-          action: 'uploadFile',
-          txId: tx.id,
-          fileName: img.file.name,
-          fileType: img.file.type || 'image/jpeg'
-        });
-        const uploadUrl = `${API_URL}?${params}`;
-        console.log("Uploading file:", img.file.name, "base64 length:", base64.length, "bytes");
-        fetch(uploadUrl, {
-          method: 'POST',
-          headers: { 'Content-Type': 'text/plain' },
-          body: base64
-        }).catch(() => {});
+        try {
+          const formData = new FormData();
+          formData.append('file', img.base64);          // รับ data URL ตรงๆ
+          formData.append('upload_preset', CLOUDINARY_PRESET);
+          formData.append('folder', 'wtr_receipts');
+
+          console.log("Uploading to Cloudinary:", img.file.name);
+          const res = await fetch(
+            `https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`,
+            { method: 'POST', body: formData }
+          );
+          const data = await res.json();
+          if (data.secure_url) {
+            urls.push(data.secure_url);
+            console.log("Cloudinary upload OK:", data.secure_url);
+          } else {
+            console.error("Cloudinary error:", data);
+          }
+        } catch (err) {
+          console.error("Upload failed:", err);
+        }
       }
 
-      // รอ 15 วิ แล้ว Sync เพื่อดึง receiptUrl ที่ GAS บันทึกไว้อัตโนมัติ
-      setTimeout(async () => {
+      // อัปเดต receiptUrl ใน Sheet ทันที
+      if (urls.length > 0) {
+        const receiptUrl = urls.join(', ');
+        // อัปเดต state ทันที
+        setTransactions(prev => prev.map(t =>
+          t.id?.toString() === tx.id?.toString() ? { ...t, receiptUrl } : t
+        ));
+        // บันทึกลง Sheet
         try {
-          const res = await fetch(`${API_URL}?action=getTransactions`, { redirect: 'follow' });
-          const data = await res.json();
-          if (Array.isArray(data)) {
-            const serverTx = data.find(t => t.id?.toString() === tx.id?.toString());
-            if (serverTx?.receiptUrl) {
-              setTransactions(prev => prev.map(t =>
-                t.id?.toString() === tx.id?.toString() ? { ...t, receiptUrl: serverTx.receiptUrl } : t
-              ));
-              console.log("Receipt URL synced:", serverTx.receiptUrl);
-            }
-          }
-        } catch (e) { console.warn("Post-upload sync failed:", e); }
-        setSyncStatus('success');
-        setTimeout(() => setSyncStatus('idle'), 2000);
-      }, 15000);
+          await fetch(API_URL, {
+            method: 'POST',
+            body: JSON.stringify({ action: 'updateTransaction', payload: { ...tx, receiptUrl } }),
+            redirect: 'follow'
+          });
+          console.log("Sheet updated with receiptUrl:", receiptUrl);
+        } catch (err) {
+          console.error("Sheet update failed:", err);
+        }
+      }
+
+      setSyncStatus('success');
+      setTimeout(() => setSyncStatus('idle'), 2000);
     };
 
     const submitTransaction = async (finalPartyName) => {
