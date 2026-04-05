@@ -494,9 +494,13 @@ export default function App() {
   };
 
   const finalizeSubmissionWithParty = async (partyName) => {
+    const CLOUDINARY_CLOUD = 'djrwxouxx';
+    const CLOUDINARY_PRESET = 'wtr_receipts';
+    const pendingImages = window._pendingImages || [];
     const finalAmount = (parseFloat(formData.unitPrice) * parseFloat(formData.quantity)) || 0;
+    const txId = Date.now();
     const newTx = {
-      id: Date.now(),
+      id: txId,
       type: modalType,
       date: formData.date,
       party: partyName,
@@ -505,20 +509,45 @@ export default function App() {
       method: formData.paymentMethod,
       time: new Date().toLocaleTimeString('th-TH', { hour: '2-digit', minute: '2-digit' }),
       category: formData.category,
-      receiptUrl: tempReceiptUrls,
+      receiptUrl: '',
       business: formData.business,
       refjob: formData.refjob
     };
-    setTransactions([newTx, ...transactions]);
+    setTransactions(prev => [newTx, ...prev]);
     setIsModalOpen(false);
     setIsNewPartyPromptOpen(false);
     setTempReceiptUrls('');
-    if (isOnline) {
+    window._pendingImages = [];
+    setSyncStatus('syncing');
+    try {
+      await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addTransaction', payload: newTx }), redirect: 'follow' });
+    } catch (err) { console.error('addTransaction failed:', err); }
+
+    // อัปโหลดรูป (ถ้ามี)
+    console.log('finalizeSubmissionWithParty: pendingImages count:', pendingImages.length);
+    const urls = [];
+    for (const img of pendingImages) {
       try {
-        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addTransaction', payload: newTx }), redirect: 'follow' });
-        setSyncStatus('success');
-      } catch (error) { setSyncStatus('error'); }
+        const formData2 = new FormData();
+        formData2.append('file', img.base64);
+        formData2.append('upload_preset', CLOUDINARY_PRESET);
+        formData2.append('folder', 'wtr_receipts');
+        const res = await fetch(`https://api.cloudinary.com/v1_1/${CLOUDINARY_CLOUD}/image/upload`, { method: 'POST', body: formData2 });
+        const data = await res.json();
+        if (data.secure_url) { urls.push(data.secure_url); console.log('Cloudinary OK:', data.secure_url); }
+        else { console.error('Cloudinary error:', data); }
+      } catch (err) { console.error('Upload error:', err); }
     }
+    if (urls.length > 0) {
+      const receiptUrl = urls.join(', ');
+      setTransactions(prev => prev.map(t => t.id === txId ? { ...t, receiptUrl } : t));
+      try {
+        await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'updateTransaction', payload: { ...newTx, receiptUrl } }), redirect: 'follow' });
+        console.log('Sheet updated with receiptUrl:', receiptUrl);
+      } catch (err) { console.error('Sheet update failed:', err); }
+    }
+    setSyncStatus('success');
+    setTimeout(() => setSyncStatus('idle'), 2000);
   };
 
   const [isAddBusinessModalOpen, setIsAddBusinessModalOpen] = useState(false);
@@ -534,13 +563,11 @@ export default function App() {
     setIsAddBusinessModalOpen(false);
     setNewBusiness({ name: '', icon: 'Briefcase' });
 
-    if (isOnline) {
-      setSyncStatus('syncing');
-      try {
-        await fetch(API_URL, { method: 'POST', mode: 'no-cors', body: JSON.stringify({ action: 'addBusiness', payload: bObj }) });
-        setSyncStatus('success');
-      } catch (e) { setSyncStatus('error'); }
-    }
+    setSyncStatus('syncing');
+    try {
+      await fetch(API_URL, { method: 'POST', body: JSON.stringify({ action: 'addBusiness', payload: bObj }), redirect: 'follow' });
+      setSyncStatus('success');
+    } catch (e) { setSyncStatus('error'); }
   };
 
   const [isEditCategoryModalOpen, setIsEditCategoryModalOpen] = useState(false);
