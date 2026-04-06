@@ -4,6 +4,17 @@
  * Version: 4.0 (Fully Managed: Create, Read, Update, Delete)
  */
 
+function testPermission() {
+  // ฟังก์ชันนี้มีไว้ให้พี่สาวกด [▷ Run] เพื่อขอสิทธิ์การใช้งานครั้งแรกค่ะ
+  // เมื่อรันแล้วขึ้น "ตรวจสอบสิทธิ์" ให้กดยอมรับจนจบนะคะ
+  try {
+    UrlFetchApp.fetch('https://www.google.com');
+    Logger.log('สิทธิ์การใช้งานถูกต้องแล้วค่ะ! พี่สาวลองสแกนใบเสร็จในแอปได้เลย');
+  } catch (e) {
+    Logger.log('เกิดข้อผิดพลาด: ' + e.toString());
+  }
+}
+
 function doGet(e) {
   const action = e.parameter.action;
   if (action === 'getTransactions') return getJsonData('Transactions');
