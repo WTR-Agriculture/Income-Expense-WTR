@@ -43,8 +43,86 @@ function doPost(e) {
   if (action === 'addParty') return addParty(data.payload);
   if (action === 'updateParty') return updateParty(data.payload);
   if (action === 'deleteParty') return deleteParty(data.payload.id);
+  if (action === 'analyzeReceiptWithAI') return analyzeReceiptWithAI(data.payload);
 
   return createResponse({ status: 'error', message: 'Unknown action' });
+}
+
+// --- OpenAI OCR & Analysis ---
+const OPENAI_CONFIG = {
+  // ★ สำคัญ: พี่สาวนำ API Key ไปใส่ใน [Project Settings] -> [Script Properties]
+  // ชื่อตัวแปร (Property): OPENAI_API_KEY
+  API_KEY: PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY')
+};
+
+
+function analyzeReceiptWithAI(payload) {
+  const { base64Image, modalType } = payload;
+  const url = 'https://api.openai.com/v1/chat/completions';
+  
+  const systemPrompt = `You are a professional accounting assistant for "WTR Ledger".
+Extract data from the provided receipt image. 
+Language: Thai or English.
+Return ONLY a JSON object with the following structure:
+{
+  "date": "YYYY-MM-DD",
+  "partyName": "Store or Customer Name",
+  "items": [
+    { "itemName": "Product Name", "unitPrice": number, "quantity": number, "category": "Best Guess Category" }
+  ]
+}
+For categories, use these if applicable: ${modalType === 'income' ? 'งานบริการ, ขายสินค้า, ขายเศษวัสดุ' : 'ค่าวัสดุ/อุปกรณ์, ค่าน้ำ/ค่าไฟ, ค่าของกิน, ค่าเครื่องมือ'}. 
+If you cannot find a piece of information, leave it as an empty string or 0.`;
+
+  const requestBody = {
+    model: "gpt-4o-mini",
+    messages: [
+      {
+        role: "system",
+        content: systemPrompt
+      },
+      {
+        role: "user",
+        content: [
+          {
+            type: "text",
+            text: "Please analyze this receipt for a " + modalType + " entry."
+          },
+          {
+            type: "image_url",
+            image_url: {
+              url: `data:image/jpeg;base64,${base64Image}`
+            }
+          }
+        ]
+      }
+    ],
+    response_format: { type: "json_object" },
+    max_tokens: 1000
+  };
+
+  const options = {
+    method: 'post',
+    contentType: 'application/json',
+    headers: {
+      Authorization: 'Bearer ' + OPENAI_CONFIG.API_KEY
+    },
+    payload: JSON.stringify(requestBody),
+    muteHttpExceptions: true
+  };
+
+  try {
+    const response = UrlFetchApp.fetch(url, options);
+    const result = JSON.parse(response.getContentText());
+    if (result.choices && result.choices.length > 0) {
+      const extractedData = JSON.parse(result.choices[0].message.content);
+      return createResponse({ status: 'success', data: extractedData });
+    } else {
+      return createResponse({ status: 'error', message: 'AI could not process the image.', raw: result });
+    }
+  } catch (err) {
+    return createResponse({ status: 'error', message: err.toString() });
+  }
 }
 
 function addTransactionsBatch(payloadArray) {

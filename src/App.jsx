@@ -99,6 +99,7 @@ export default function App() {
 
   // Detail View State
   const [selectedDetailTx, setSelectedDetailTx] = useState(null);
+  const [isScanning, setIsScanning] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
 
   // Data State with Cache
@@ -545,6 +546,62 @@ export default function App() {
     }
     setIsEditMode(false);
     setEditingTxId(null);
+  };
+
+  const handleAIScan = async () => {
+    if (selectedImages.length === 0) {
+      alert('กรุณาเลือกหรือถ่ายรูปใบเสร็จก่อนสแกนนะคะ');
+      return;
+    }
+
+    setIsScanning(true);
+    try {
+      // ใช้รูปแรกที่ถูกเลือก
+      const base64Data = selectedImages[0].base64.split(',')[1];
+      
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        body: JSON.stringify({
+          action: 'analyzeReceiptWithAI',
+          payload: {
+            base64Image: base64Data,
+            modalType: modalType
+          }
+        }),
+        redirect: 'follow'
+      });
+
+      const result = await response.json();
+      
+      if (result.status === 'success' && result.data) {
+        const ai = result.data;
+        
+        // แมปข้อมูลหลัก
+        const updatedFormData = {
+          ...formData,
+          date: ai.date || formData.date,
+          partyName: ai.partyName || formData.partyName,
+          items: ai.items && ai.items.length > 0 
+            ? ai.items.map((it, idx) => ({
+                id: Date.now() + idx,
+                itemName: it.itemName || '',
+                unitPrice: it.unitPrice || 0,
+                quantity: it.quantity || 1,
+                category: it.category || (categories[formData.business]?.[modalType]?.[0] || 'ทั่วไป')
+              }))
+            : formData.items
+        };
+        
+        setFormData(updatedFormData);
+      } else {
+        alert('AI ไม่สามารถอ่านข้อมูลได้: ' + (result.message || 'Unknown error'));
+      }
+    } catch (err) {
+      console.error('AI Scan Error:', err);
+      alert('เกิดข้อผิดพลาดในการสแกนค่ะ');
+    } finally {
+      setIsScanning(false);
+    }
   };
 
   const handleConfirmNewPartySave = async (shouldSave) => {
@@ -1434,9 +1491,25 @@ export default function App() {
 
               <div className="space-y-2">
                 <label className="text-[9px] font-black uppercase opacity-40 ml-1">แนบรูปใบเสร็จ</label>
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap gap-2 items-center">
                   {selectedImages.map(img => (<div key={img.id} className="relative w-16 h-16 rounded-xl overflow-hidden shadow-md group"><img src={img.preview} className="w-full h-full object-cover" /><button type="button" onClick={() => setSelectedImages(selectedImages.filter(i => i.id !== img.id))} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-rose-500"><X size={12} /></button></div>))}
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-xl border-2 border-dashed border-[#EAE3F4] flex flex-col items-center justify-center text-[#7A7585] hover:bg-[#F8F7FA] transition active:scale-95"><Camera size={20} /><span className="text-[8px] font-black mt-1">เพิ่มรูป</span></button>
+                  
+                  {selectedImages.length > 0 && (
+                    <button 
+                      type="button" 
+                      onClick={handleAIScan}
+                      disabled={isScanning}
+                      className={`h-16 px-6 rounded-2xl bg-[#DDFD54] text-[#1D1B20] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all active:scale-95 ${isScanning ? 'opacity-50 pointer-events-none' : 'hover:scale-105'}`}
+                    >
+                      {isScanning ? (
+                        <RefreshCcw size={16} className="animate-spin" />
+                      ) : (
+                        <Sparkles size={16} />
+                      )}
+                      {isScanning ? 'AI Scanning...' : 'Scan with AI'}
+                    </button>
+                  )}
                 </div>
               </div>
 
@@ -1448,6 +1521,23 @@ export default function App() {
               </div>
               <button type="submit" disabled={syncStatus === 'syncing'} className={`w-full py-5 rounded-full text-lg font-black transition-all shadow-2xl flex items-center justify-center gap-3 ${modalType === 'income' ? 'bg-[#DDFD54] text-[#1D1B20]' : 'bg-[#AE88F9] text-white'}`}>{syncStatus === 'syncing' ? <RefreshCcw className="animate-spin" /> : <CloudUpload />} {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 'ยืนยันการบันทึกรายการ'}</button>
             </form>
+
+            {/* AI Scan Overlay */}
+            {isScanning && (
+              <div className="absolute inset-0 z-[1000] bg-white/80 backdrop-blur-md flex flex-col items-center justify-center p-8 text-center animate-in fade-in duration-300">
+                <div className="w-24 h-24 relative mb-6">
+                  <div className="absolute inset-0 border-4 border-[#AE88F9]/20 rounded-full"></div>
+                  <div className="absolute inset-0 border-4 border-[#AE88F9] rounded-full border-t-transparent animate-spin"></div>
+                  <div className="absolute inset-0 flex items-center justify-center text-[#AE88F9]">
+                    <Sparkles size={40} className="animate-pulse" />
+                  </div>
+                </div>
+                <h3 className="text-xl font-black uppercase tracking-tighter mb-2">กำลังสแกนใบเสร็จด้วย AI...</h3>
+                <p className="text-[10px] font-black text-[#7A7585] uppercase tracking-widest leading-relaxed">
+                  กรุณารอสักครู่ค่ะ ระบบกำลังเรียก GPT-4o-mini<br />เพื่อดึงข้อมูลรายการและราคาจากภาพ
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}
