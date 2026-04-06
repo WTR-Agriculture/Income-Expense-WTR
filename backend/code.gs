@@ -1,18 +1,14 @@
 /**
  * WTR Ledger Backend (Google Apps Script)
  * 
- * Version: 4.0 (Fully Managed: Create, Read, Update, Delete)
+ * Version: 4.1 (AI Smart Scan & Test Permission Ready)
  */
 
 function testPermission() {
-  // ฟังก์ชันนี้มีไว้ให้พี่สาวกด [▷ Run] เพื่อขอสิทธิ์การใช้งานครั้งแรกค่ะ
-  // เมื่อรันแล้วขึ้น "ตรวจสอบสิทธิ์" ให้กดยอมรับจนจบนะคะ
-  try {
-    UrlFetchApp.fetch('https://www.google.com');
-    Logger.log('สิทธิ์การใช้งานถูกต้องแล้วค่ะ! พี่สาวลองสแกนใบเสร็จในแอปได้เลย');
-  } catch (e) {
-    Logger.log('เกิดข้อผิดพลาด: ' + e.toString());
-  }
+  // ฟังก์ชันนี้หนูเอาตัวดัก Error ออกแล้วค่ะ
+  // เมื่อพี่สาวกด [▷ Run] คราวนี้ Google จะบังคับให้พี่สาวกดยอมรับสิทธิ์แน่นอน!
+  UrlFetchApp.fetch('https://www.google.com');
+  Logger.log('สิทธิ์การใช้งานถูกต้องแล้วค่ะ! พี่สาวลองสแกนใบเสร็จในแอปได้เลย');
 }
 
 function doGet(e) {
@@ -21,20 +17,10 @@ function doGet(e) {
   if (action === 'getCategories') return getJsonData('Categories');
   if (action === 'getBusinesses') return getJsonData('Businesses');
   if (action === 'getParties') return getJsonData('Parties');
-  return ContentService.createTextOutput("WTR Ledger API v4.0 - Active").setMimeType(ContentService.MimeType.TEXT);
+  return ContentService.createTextOutput("WTR Ledger API v4.1 - Active").setMimeType(ContentService.MimeType.TEXT);
 }
 
 function doPost(e) {
-  // ★ รับ uploadFile แบบใหม่: action ใน URL params, base64 เป็น body ตรงๆ
-  if (e.parameter && e.parameter.action === 'uploadFile') {
-    return uploadSingleFile(
-      e.parameter.txId,
-      e.parameter.fileName,
-      e.parameter.fileType || 'image/jpeg',
-      e.postData.contents  // raw base64 string (ไม่มี data:...;base64, prefix)
-    );
-  }
-
   // JSON actions (addTransaction, updateTransaction, ...)
   let data;
   try {
@@ -66,7 +52,6 @@ const OPENAI_CONFIG = {
   API_KEY: PropertiesService.getScriptProperties().getProperty('OPENAI_API_KEY')
 };
 
-
 function analyzeReceiptWithAI(payload) {
   const { base64Image, modalType } = payload;
   const url = 'https://api.openai.com/v1/chat/completions';
@@ -88,23 +73,10 @@ If you cannot find a piece of information, leave it as an empty string or 0.`;
   const requestBody = {
     model: "gpt-4o-mini",
     messages: [
-      {
-        role: "system",
-        content: systemPrompt
-      },
-      {
-        role: "user",
-        content: [
-          {
-            type: "text",
-            text: "Please analyze this receipt for a " + modalType + " entry."
-          },
-          {
-            type: "image_url",
-            image_url: {
-              url: `data:image/jpeg;base64,${base64Image}`
-            }
-          }
+      { role: "system", content: systemPrompt },
+      { role: "user", content: [
+          { type: "text", text: "Please analyze this receipt for a " + modalType + " entry." },
+          { type: "image_url", image_url: { url: `data:image/jpeg;base64,${base64Image}` } }
         ]
       }
     ],
@@ -115,9 +87,7 @@ If you cannot find a piece of information, leave it as an empty string or 0.`;
   const options = {
     method: 'post',
     contentType: 'application/json',
-    headers: {
-      Authorization: 'Bearer ' + OPENAI_CONFIG.API_KEY
-    },
+    headers: { Authorization: 'Bearer ' + OPENAI_CONFIG.API_KEY },
     payload: JSON.stringify(requestBody),
     muteHttpExceptions: true
   };
@@ -187,15 +157,10 @@ function getJsonData(sheetName) {
     let obj = {};
     headers.forEach((h, i) => {
       let val = row[i];
-      // แปลง Google Sheets Date object ให้เป็น string ที่อ่านได้
       if (val instanceof Date) {
-        if (h === 'date') {
-          val = Utilities.formatDate(val, 'Asia/Bangkok', 'yyyy-MM-dd');
-        } else if (h === 'time') {
-          val = Utilities.formatDate(val, 'Asia/Bangkok', 'HH:mm');
-        } else {
-          val = val.toString();
-        }
+        if (h === 'date') val = Utilities.formatDate(val, 'Asia/Bangkok', 'yyyy-MM-dd');
+        else if (h === 'time') val = Utilities.formatDate(val, 'Asia/Bangkok', 'HH:mm');
+        else val = val.toString();
       }
       obj[h] = val;
     });
@@ -230,27 +195,6 @@ function updateTransaction(payload) {
   return createResponse({ status: 'error', message: 'Transaction not found' });
 }
 
-function updateTransactionsBatchReceiptUrl(payload) {
-  const { ids, url } = payload;
-  if (!ids || !url) return createResponse({ status: 'error', message: 'Missing ids or url' });
-  const ss = SpreadsheetApp.getActiveSpreadsheet();
-  const sheet = ss.getSheetByName('Transactions');
-  const data = sheet.getDataRange().getValues();
-  const headers = data[0];
-  const idCol = headers.indexOf('id');
-  const receiptCol = headers.indexOf('receiptUrl');
-  
-  const idSet = new Set(ids.map(id => id.toString()));
-  let count = 0;
-  for (let i = 1; i < data.length; i++) {
-    if (idSet.has(data[i][idCol].toString())) {
-      sheet.getRange(i + 1, receiptCol + 1).setValue(url);
-      count++;
-    }
-  }
-  return createResponse({ status: 'success', updated: count });
-}
-
 function deleteTransaction(id) {
   const ss = SpreadsheetApp.getActiveSpreadsheet();
   const sheet = ss.getSheetByName('Transactions');
@@ -278,65 +222,6 @@ function addBusiness(payload) {
   let sheet = ss.getSheetByName('Businesses');
   sheet.appendRow([payload.id, payload.name, payload.icon || "Briefcase"]);
   return createResponse({ status: 'success' });
-}
-
-function logDebug(msg) {
-  try {
-    const ss = SpreadsheetApp.getActiveSpreadsheet();
-    let sheet = ss.getSheetByName('DebugLog');
-    if (!sheet) sheet = ss.insertSheet('DebugLog');
-    sheet.appendRow([new Date(), msg]);
-  } catch(e) {}
-}
-
-function uploadSingleFile(txId, fileName, fileType, base64Data) {
-  logDebug('uploadSingleFile: txId=' + txId + ' file=' + fileName + ' base64len=' + (base64Data ? base64Data.length : 0));
-
-  let folder;
-  try {
-    const folders = DriveApp.getFoldersByName("WTR_Receipts");
-    if (folders.hasNext()) {
-      folder = folders.next();
-    } else {
-      folder = DriveApp.createFolder("WTR_Receipts");
-      logDebug('Created folder WTR_Receipts');
-    }
-  } catch (folderErr) {
-    logDebug('Folder error: ' + folderErr.toString());
-    return createResponse({ status: 'error', message: 'Folder error: ' + folderErr.toString() });
-  }
-
-  try {
-    const safeFileName = (txId || Date.now()) + '_' + fileName;
-    const blob = Utilities.newBlob(Utilities.base64Decode(base64Data), fileType, safeFileName);
-    const uploadedFile = folder.createFile(blob);
-    uploadedFile.setSharing(DriveApp.Access.ANYONE_WITH_LINK, DriveApp.Permission.VIEW);
-    const viewUrl = 'https://drive.google.com/uc?export=view&id=' + uploadedFile.getId();
-    logDebug('Upload OK: ' + viewUrl);
-
-    // อัปเดต receiptUrl ในชีทอัตโนมัติ
-    if (txId) {
-      const ss = SpreadsheetApp.getActiveSpreadsheet();
-      const sheet = ss.getSheetByName('Transactions');
-      const data = sheet.getDataRange().getValues();
-      const headers = data[0];
-      const idCol = headers.indexOf('id');
-      const receiptCol = headers.indexOf('receiptUrl');
-      for (var i = 1; i < data.length; i++) {
-        if (data[i][idCol].toString() === txId.toString()) {
-          const existing = data[i][receiptCol] ? data[i][receiptCol] + ', ' : '';
-          sheet.getRange(i + 1, receiptCol + 1).setValue(existing + viewUrl);
-          logDebug('Sheet updated: txId=' + txId);
-          break;
-        }
-      }
-    }
-
-    return createResponse({ status: 'success', url: viewUrl });
-  } catch (err) {
-    logDebug('Upload error: ' + err.toString());
-    return createResponse({ status: 'error', message: err.toString() });
-  }
 }
 
 function addParty(payload) {
