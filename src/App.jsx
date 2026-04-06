@@ -18,7 +18,7 @@ const STORAGE_KEYS = {
   BUSINESSES: 'wtr_ledger_businesses'
 };
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbyxJQRNWOJaM7eTfHBWeLtXMp5WrzW1VTgRldDIs69dl7d1egkwX-QfNcDGs9YPf72-zQ/exec';
+const API_URL = 'https://script.https://script.google.com/macros/s/AKfycbyxJQRNWOJaM7eTfHBWeLtXMp5WrzW1VTgRldDIs69dl7d1egkwX-QfNcDGs9YPf72-zQ/exec.com/macros/s/AKfycbyxJQRNWOJaM7eTfHBWeLtXMp5WrzW1VTgRldDIs69dl7d1egkwX-QfNcDGs9YPf72-zQ/exec';
 
 const DEFAULT_BUSINESSES = [
   { id: 'garage', name: 'อู่', icon: 'Wrench' }
@@ -561,7 +561,7 @@ export default function App() {
     try {
       // ใช้รูปแรกที่ถูกเลือก
       const base64Data = selectedImages[0].base64.split(',')[1];
-      
+
       const response = await fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
@@ -575,26 +575,26 @@ export default function App() {
       });
 
       const result = await response.json();
-      
+
       if (result.status === 'success' && result.data) {
         const ai = result.data;
-        
+
         // แมปข้อมูลหลัก
         const updatedFormData = {
           ...formData,
           date: ai.date || formData.date,
           partyName: ai.partyName || formData.partyName,
-          items: ai.items && ai.items.length > 0 
+          items: ai.items && ai.items.length > 0
             ? ai.items.map((it, idx) => ({
-                id: Date.now() + idx,
-                itemName: it.itemName || '',
-                unitPrice: it.unitPrice || 0,
-                quantity: it.quantity || 1,
-                category: it.category || (categories[formData.business]?.[modalType]?.[0] || 'ทั่วไป')
-              }))
+              id: Date.now() + idx,
+              itemName: it.itemName || '',
+              unitPrice: it.unitPrice || 0,
+              quantity: it.quantity || 1,
+              category: it.category || (categories[formData.business]?.[modalType]?.[0] || 'ทั่วไป')
+            }))
             : formData.items
         };
-        
+
         setFormData(updatedFormData);
       } else {
         alert('AI ไม่สามารถอ่านข้อมูลได้: ' + (result.message || 'Unknown error'));
@@ -1087,7 +1087,7 @@ export default function App() {
                   <div className="w-10 h-10 bg-[#DDFD54]/10 rounded-2xl flex items-center justify-center"><RefreshCcw size={20} className="text-[#DDFD54]" /></div>
                   <h3 className="text-xl font-black tracking-tighter uppercase leading-none">การจัดการระบบ & ความปลอดภัย</h3>
                 </div>
-                
+
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
                   <div>
                     <h4 className="font-black text-lg text-[#DDFD54] mb-1">เวอร์ชันปัจจุบัน: WTR Ledger v3.2</h4>
@@ -1095,9 +1095,9 @@ export default function App() {
                       {needRefresh ? 'ตรวจพบเวอร์ชันใหม่ที่เสถียรกว่า!' : 'คุณกำลังใช้งานเวอร์ชันล่าสุดที่เสถียรที่สุดค่ะ'}
                     </p>
                   </div>
-                  
+
                   {needRefresh ? (
-                    <button 
+                    <button
                       onClick={() => updateServiceWorker(true)}
                       className="w-full md:w-auto bg-[#DDFD54] text-[#1D1B20] px-8 py-4 rounded-[24px] font-black text-sm shadow-[0_10px_30px_rgba(221,253,84,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">
                       <Sparkles size={18} /> อัปเดตเข้าระบบล่าสุด
@@ -1501,10 +1501,10 @@ export default function App() {
                 <div className="flex flex-wrap gap-2 items-center">
                   {selectedImages.map(img => (<div key={img.id} className="relative w-16 h-16 rounded-xl overflow-hidden shadow-md group"><img src={img.preview} className="w-full h-full object-cover" /><button type="button" onClick={() => setSelectedImages(selectedImages.filter(i => i.id !== img.id))} className="absolute top-1 right-1 bg-white/80 p-1 rounded-full text-rose-500"><X size={12} /></button></div>))}
                   <button type="button" onClick={() => fileInputRef.current?.click()} className="w-16 h-16 rounded-xl border-2 border-dashed border-[#EAE3F4] flex flex-col items-center justify-center text-[#7A7585] hover:bg-[#F8F7FA] transition active:scale-95"><Camera size={20} /><span className="text-[8px] font-black mt-1">เพิ่มรูป</span></button>
-                  
+
                   {selectedImages.length > 0 && (
-                    <button 
-                      type="button" 
+                    <button
+                      type="button"
                       onClick={handleAIScan}
                       disabled={isScanning}
                       className={`h-16 px-6 rounded-2xl bg-[#DDFD54] text-[#1D1B20] font-black text-[10px] uppercase tracking-widest flex items-center gap-2 shadow-lg transition-all active:scale-95 ${isScanning ? 'opacity-50 pointer-events-none' : 'hover:scale-105'}`}
