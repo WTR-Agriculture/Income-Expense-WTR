@@ -1095,8 +1095,11 @@ export default function App() {
                     return (
                       <div key={p.id} onClick={() => { setSelectedParty(p); setIsPartyHistoryOpen(true); }} className="bg-white p-6 rounded-[32px] border-2 border-[#EAE3F4] hover:border-[#AE88F9] transition-all cursor-pointer group shadow-sm">
                         <div className="flex justify-between items-start mb-4">
-                          <div className={`px-3 py-1 rounded-full text-[8px] font-black uppercase ${p.type === 'customer' ? 'bg-emerald-50 text-emerald-500' : 'bg-[#AE88F9]/10 text-[#AE88F9]'}`}>{p.type === 'customer' ? 'ลูกค้า' : 'ร้านค้า'}</div>
-                          <button onClick={(e) => { e.stopPropagation(); if (confirm('ลบลูกค้านี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16} /></button>
+                          <div className="flex gap-1 flex-wrap">
+                            {(p.type === 'customer' || p.type === 'both') && <div className="px-3 py-1 rounded-full text-[8px] font-black uppercase bg-emerald-50 text-emerald-500">ลูกค้า</div>}
+                            {(p.type === 'supplier' || p.type === 'both') && <div className="px-3 py-1 rounded-full text-[8px] font-black uppercase bg-[#AE88F9]/10 text-[#AE88F9]">ร้านค้า</div>}
+                          </div>
+                          <button onClick={(e) => { e.stopPropagation(); if (confirm('ลบรายชื่อนี้?')) handleDeleteParty(p.id); }} className="opacity-0 group-hover:opacity-100 p-2 text-rose-300 hover:text-rose-500 transition-all"><Trash2 size={16} /></button>
                         </div>
                         <h4 className="font-black text-xl mb-1 truncate leading-tight uppercase tracking-tight">{p.name}</h4>
                         <p className="text-[10px] font-black opacity-30 uppercase tracking-widest mb-4">Activity: {pHistory.length} รายการ</p>
@@ -1215,7 +1218,7 @@ export default function App() {
                     <button
                       disabled={isDupName || !newPartyInput.name.trim()}
                       onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'customer' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
-                      className={`py-5 rounded-3xl font-black text-sm transition ${isDupName || !newPartyInput.name.trim()
+                      className={`flex-1 py-5 rounded-3xl font-black text-xs md:text-sm transition ${isDupName || !newPartyInput.name.trim()
                         ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                         : 'bg-emerald-50 text-emerald-600 hover:scale-[1.02] shadow-sm'
                         }`}>
@@ -1224,11 +1227,20 @@ export default function App() {
                     <button
                       disabled={isDupName || !newPartyInput.name.trim()}
                       onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'supplier' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
-                      className={`py-5 rounded-3xl font-black text-sm transition ${isDupName || !newPartyInput.name.trim()
+                      className={`flex-1 py-5 rounded-3xl font-black text-xs md:text-sm transition ${isDupName || !newPartyInput.name.trim()
                         ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
                         : 'bg-[#AE88F9]/10 text-[#AE88F9] hover:scale-[1.02] shadow-sm'
                         }`}>
                       ร้านค้า
+                    </button>
+                    <button
+                      disabled={isDupName || !newPartyInput.name.trim()}
+                      onClick={() => { if (newPartyInput.name.trim()) handleAddParty({ name: newPartyInput.name.trim(), type: 'both' }).then(ok => ok && setNewPartyInput({ name: '', type: 'customer' })); }}
+                      className={`flex-1 py-5 rounded-3xl font-black text-xs md:text-sm transition ${isDupName || !newPartyInput.name.trim()
+                        ? 'bg-gray-100 text-gray-300 cursor-not-allowed'
+                        : 'bg-[#1D1B20] text-[#DDFD54] hover:scale-[1.02] shadow-sm'
+                        }`}>
+                      เป็นทั้งคู่
                     </button>
                   </div>
                 </div>
@@ -1305,7 +1317,10 @@ export default function App() {
                   />
                   <datalist id="parties-list">
                     {sortedPartiesByFrequency
-                      .filter(p => p.type === (modalType === 'income' ? 'customer' : 'supplier'))
+                      .filter(p => {
+                        if (modalType === 'income') return p.type === 'customer' || p.type === 'both';
+                        return p.type === 'supplier' || p.type === 'both';
+                      })
                       .map(p => <option key={p.id} value={p.name} />)
                     }
                   </datalist>
