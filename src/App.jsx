@@ -61,6 +61,7 @@ export default function App() {
   const [settingsTab, setSettingsTab] = useState('businesses'); // 'businesses' | 'parties'
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   // --- PWA Reload Prompt Logic ---
   const {
     offlineReady: [offlineReady, setOfflineReady],
@@ -471,7 +472,7 @@ export default function App() {
     const editingId = editingTxId;
     const isEditing = isEditMode;
     setSelectedImages([]);
-    setSyncStatus('syncing');
+    setIsSubmitting(true);
 
     // 2. Upload to Google Sheets
     const saveToSheets = async () => {
@@ -527,10 +528,12 @@ export default function App() {
             });
           }
         }
+        setIsSubmitting(false);
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 2000);
       } catch (err) {
         console.error("Submission failed:", err);
+        setIsSubmitting(false);
         setSyncStatus('error');
       }
     };
@@ -598,7 +601,11 @@ export default function App() {
       }
     } catch (err) {
       console.error('AI Scan Error:', err);
-      alert('เกิดข้อผิดพลาดในการสแกนค่ะ');
+      if (err.toString().includes('UrlFetchApp') || err.toString().includes('authorization')) {
+        alert('ติดปัญหาเรื่องสิทธิ์การเข้าถึงค่ะ! กรุณากดปุ่ม [Run] ในหน้า Google Script เพื่อกดยืนยันสิทธิ์ก่อนนะคะ');
+      } else {
+        alert('เกิดข้อผิดพลาดในการสแกนค่ะ: ' + err.message);
+      }
     } finally {
       setIsScanning(false);
     }
@@ -1519,7 +1526,7 @@ export default function App() {
                   {formatCurrency(formData.items.reduce((sum, it) => sum + (parseFloat(it.unitPrice) * parseFloat(it.quantity) || 0), 0))}
                 </h3>
               </div>
-              <button type="submit" disabled={syncStatus === 'syncing'} className={`w-full py-5 rounded-full text-lg font-black transition-all shadow-2xl flex items-center justify-center gap-3 ${modalType === 'income' ? 'bg-[#DDFD54] text-[#1D1B20]' : 'bg-[#AE88F9] text-white'}`}>{syncStatus === 'syncing' ? <RefreshCcw className="animate-spin" /> : <CloudUpload />} {syncStatus === 'syncing' ? 'กำลังบันทึก...' : 'ยืนยันการบันทึกรายการ'}</button>
+              <button type="submit" disabled={isSubmitting} className={`w-full py-5 rounded-full text-lg font-black transition-all shadow-2xl flex items-center justify-center gap-3 ${modalType === 'income' ? 'bg-[#DDFD54] text-[#1D1B20]' : 'bg-[#AE88F9] text-white'}`}>{isSubmitting ? <RefreshCcw className="animate-spin" /> : <CloudUpload />} {isSubmitting ? 'กำลังบันทึก...' : 'ยืนยันการบันทึกรายการ'}</button>
             </form>
 
             {/* AI Scan Overlay */}
