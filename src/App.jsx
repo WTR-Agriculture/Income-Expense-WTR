@@ -18,7 +18,7 @@ const STORAGE_KEYS = {
   BUSINESSES: 'wtr_ledger_businesses'
 };
 
-const API_URL = 'https://script.google.com/macros/s/AKfycbxDpm25HlYNovT-Aoio5Pz3A4gbwuSEP3yJNw3jsyGKXB88SEGCCq8hfl1uBSWnvkv9Rg/exechttps://script.google.com/macros/s/AKfycbxDpm25HlYNovT-Aoio5Pz3A4gbwuSEP3yJNw3jsyGKXB88SEGCCq8hfl1uBSWnvkv9Rg/exec';
+const API_URL = 'https://script.google.com/macros/s/AKfycbxDpm25HlYNovT-Aoio5Pz3A4gbwuSEP3yJNw3jsyGKXB88SEGCCq8hfl1uBSWnvkv9Rg/exec';
 
 const DEFAULT_BUSINESSES = [
   { id: 'garage', name: 'อู่', icon: 'Wrench' }
