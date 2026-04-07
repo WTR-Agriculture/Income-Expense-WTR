@@ -58,35 +58,30 @@ function analyzeReceiptWithAI(payload) {
   
   const partyListContext = existingParties ? existingParties.map(p => `${p.name} ${p.note ? '(' + p.note + ')' : ''}`).join(', ') : 'None';
 
-  const systemPrompt = `You are a professional accounting assistant for "WTR Ledger", a specialized boatyard (อู่เรือ) and pipe assembly workshop.
-Your goal is to extract transaction data from one or more provided images (e.g., a bill and a bank transfer slip).
+  const systemPrompt = `You are a professional accounting assistant for "WTR Ledger".
+Your goal is to extract transaction data with HIGH FIDELITY from one or more provided images.
 
-RECONCILIATION LOGIC:
-- If multiple images are provided, they represent the same transaction.
-- Use the BILL/INVOICE for item details, quantities, and prices.
-- Use the TRANSFER SLIP for confirming the "Party Name" (who sent/received money) and payment verification.
-- For slips, the "Party Name" is the person/company on the other side of the transaction (Look for "From/จาก" or "To/ถึง" names). 
-- IMPORTANT: IGNORE bank names like "Kasikorn", "K-Bank", "SCB", "Krungthai", "Bangkok Bank" as the Party Name.
-
-THAI HANDWRITING & CONTEXT:
-- The images often contain Thai handwriting. Use business context to improve OCR accuracy.
-- Common items: งานต่อเรือ, ตัดเลเซอร์, ประกอบท่อ, ฟิตติ้ง (Fitting), แผ่นเหล็ก, น็อต, สกรู, วัสดุสิ้นเปลือง, น้ำมันเครื่อง, ใบส่งของ, บิลเงินสด.
-- Existing Known Parties: ${partyListContext}. If the extracted name matches or is a nickname/real name of an existing party, use the EXACT name from the list.
-
-DATA EXTRACTION:
-- Extract "vatAmount" if 7% VAT (ภาษีมูลค่าเพิ่ม) is explicitly shown.
-- Categories MUST be one of: ${modalType === 'income' ? 'งานบริการ, ขายสินค้า, ขายเศษวัสดุ, อื่นๆ' : 'ค่าวัสดุ/อุปกรณ์, ค่าน้ำ/ค่าไฟ, ค่าของกิน, ค่าเครื่องมือ, อื่นๆ'}.
+STRICT RULES:
+1. READ EXACTLY WHAT IS WRITTEN: Prioritize actual text visible in the image over everything else. Do NOT hallucinate or force a word to fit a business category if the image clearly says something else (e.g., if it says "Coffee", do NOT change it to "Steel").
+2. RECONCILIATION: Combine data from multiple images (e.g., bill + slip) into one transaction. 
+3. PARTY NAME: 
+   - From Bills: Look for the clear Header/Logo of the store (e.g., ESDES). 
+   - From Slips: Use the account name from "From/จาก" or "To/ถึง".
+   - IGNORE bank names (e.g., Kasikorn, SCB).
+   - Match with existing parties if there's a clear link: ${partyListContext}.
+4. CATEGORIES: Select the most logical category: ${modalType === 'income' ? 'งานบริการ, ขายสินค้า, ขายเศษวัสดุ, อื่นๆ' : 'ค่าวัสดุ/อุปกรณ์, ค่าน้ำ/ค่าไฟ, ค่าของกิน, ค่าเครื่องมือ, อื่นๆ'}.
+5. VAT: Extract "vatAmount" only if explicitly stated.
 
 Return ONLY a JSON object:
 {
   "date": "YYYY-MM-DD",
-  "partyName": "Best matched Party Name",
+  "partyName": "True store/person name",
   "vatAmount": number,
   "items": [
-    { "itemName": "Product Name", "unitPrice": number, "quantity": number, "category": "Matched Category" }
+    { "itemName": "Actual Item Name from Image", "unitPrice": number, "quantity": number, "category": "Logical Category" }
   ]
 }
-If info is missing, use "" or 0. Output Thai for names and items.`;
+Output Thai for names and items. Use 0 or "" if missing.`;
 
   const userContent = [
     { type: "text", text: `Please analyze these ${base64Images.length} images for a ${modalType} entry. Reconcile bill details with slip names if both are present.` }
