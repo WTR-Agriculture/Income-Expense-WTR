@@ -83,14 +83,17 @@ export default function App() {
 
   // ฟังก์ชันล้างค่าและเริ่มระบบใหม่ (Hard Refresh)
   const handleHardRefresh = () => {
-    if (window.confirm('คุณต้องการล้างแคชและเริ่มระบบใหม่รึเปล่าคะ? (ข้อมูลในมือถือจะไม่หายค่ะ)')) {
-      if (window.caches) {
-        caches.keys().then((names) => {
-          for (let name of names) caches.delete(name);
-        });
-      }
-      window.location.reload(true);
+    setIsHardRefreshModalOpen(true);
+  };
+
+  const confirmHardRefresh = () => {
+    setIsHardRefreshModalOpen(false);
+    if (window.caches) {
+      caches.keys().then((names) => {
+        for (let name of names) caches.delete(name);
+      });
     }
+    window.location.reload(true);
   };
 
   // ตรวจสอบอัปเดตอัตโนมัติเมื่อมีการสลับหน้าจอ (Tab Focus)
@@ -131,6 +134,7 @@ export default function App() {
   const [selectedDetailTx, setSelectedDetailTx] = useState(null);
   const [isScanning, setIsScanning] = useState(false);
   const [isDetailModalOpen, setIsDetailModalOpen] = useState(false);
+  const [isHardRefreshModalOpen, setIsHardRefreshModalOpen] = useState(false);
 
   // Data State with Cache
   const [businesses, setBusinesses] = useState(() => {
@@ -1721,6 +1725,24 @@ export default function App() {
             <div className="flex flex-col w-full gap-2">
               <button onClick={() => setIsDeleteModalOpen(false)} className="w-full py-3.5 bg-white border border-gray-200 rounded-2xl font-black text-gray-500 hover:bg-gray-50 transition-colors">Cancel</button>
               <button onClick={handleDeleteTransaction} className="w-full py-3.5 bg-rose-600 text-white rounded-2xl font-black shadow-lg shadow-rose-200 hover:bg-rose-700 active:scale-95 transition-all">Confirm</button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Deluxe Hard Refresh Confirmation Modal */}
+      {isHardRefreshModalOpen && (
+        <div className="fixed inset-0 z-[400] flex items-center justify-center p-4 bg-black/40 backdrop-blur-sm animate-in fade-in duration-200">
+          <div className="bg-white p-8 rounded-[32px] w-full max-w-sm shadow-2xl flex flex-col items-center text-center animate-in zoom-in-95 duration-200">
+            <div className="w-14 h-14 bg-[#DDFD54]/20 rounded-full flex items-center justify-center mb-4">
+              <RefreshCcw size={28} className="text-[#1D1B20]" />
+            </div>
+            <h3 className="text-xl font-black text-[#1D1B20] mb-2 uppercase tracking-tighter">System Refresh</h3>
+            <p className="text-[#7A7585] font-black text-xs mb-8 leading-relaxed uppercase tracking-widest">คุณต้องการล้างแคชและเริ่มระบบใหม่รึเปล่าคะ?<br /><span className="opacity-60">(ข้อมูลในมือถือจะไม่หายค่ะ)</span></p>
+
+            <div className="flex flex-col w-full gap-2">
+              <button onClick={() => setIsHardRefreshModalOpen(false)} className="w-full py-3.5 bg-[#F8F7FA] text-[#7A7585] rounded-2xl font-black text-xs transition-colors lowercase tracking-widest hover:bg-[#EAE3F4]">ยกเลิก (cancel)</button>
+              <button onClick={confirmHardRefresh} className="w-full py-3.5 bg-[#1D1B20] text-[#DDFD54] rounded-2xl font-black text-xs shadow-xl active:scale-95 transition-all uppercase tracking-widest">ตกลง (proceed)</button>
             </div>
           </div>
         </div>

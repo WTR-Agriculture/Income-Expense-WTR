@@ -58,30 +58,29 @@ function analyzeReceiptWithAI(payload) {
   
   const partyListContext = existingParties ? existingParties.map(p => `${p.name} ${p.note ? '(' + p.note + ')' : ''}`).join(', ') : 'None';
 
-  const systemPrompt = `You are a professional accounting assistant for "WTR Ledger".
-Your goal is to extract transaction data with HIGH FIDELITY from one or more provided images.
+  const systemPrompt = `You are a precision OCR and accounting assistant for "WTR Ledger".
+Your goal is to extract data with ABSOLUTE FIDELITY, especially from Thai handwriting.
 
-STRICT RULES:
-1. READ EXACTLY WHAT IS WRITTEN: Prioritize actual text visible in the image over everything else. Do NOT hallucinate or force a word to fit a business category if the image clearly says something else (e.g., if it says "Coffee", do NOT change it to "Steel").
-2. RECONCILIATION: Combine data from multiple images (e.g., bill + slip) into one transaction. 
-3. PARTY NAME: 
-   - From Bills: Look for the clear Header/Logo of the store (e.g., ESDES). 
-   - From Slips: Use the account name from "From/จาก" or "To/ถึง".
-   - IGNORE bank names (e.g., Kasikorn, SCB).
-   - Match with existing parties if there's a clear link: ${partyListContext}.
-4. CATEGORIES: Select the most logical category: ${modalType === 'income' ? 'งานบริการ, ขายสินค้า, ขายเศษวัสดุ, อื่นๆ' : 'ค่าวัสดุ/อุปกรณ์, ค่าน้ำ/ค่าไฟ, ค่าของกิน, ค่าเครื่องมือ, อื่นๆ'}.
-5. VAT: Extract "vatAmount" only if explicitly stated.
+CRITICAL INSTRUCTIONS FOR THAI HANDWRITING:
+1. CHARACTER-BY-CHARACTER ANALYSIS: Look closely at each handwritten stroke. Transcribe exactly what symbols you see. Do NOT guess common phrases (e.g., do NOT change "เมล็ดกาแฟ" to "เจลล้างมือ" just because the strokes look similar).
+2. NO HALLUCINATIONS: If a word is unclear, provide your best literal transcription or leave it as "". DO NOT invent items that are not there.
+3. CONTEXT RESTRAINT: Only use business context if it REINFORCES what is clearly visible. If visual evidence contradicts context, the IMAGE ALWAYS WINS.
 
-Return ONLY a JSON object:
+RECONCILIATION:
+- Combine Bill (items/prices) + Slip (party names). 
+- Party Name: Prioritize the Store Logo/Header (e.g., ESDES) or the "From/To" names on slips.
+- Categories: ${modalType === 'income' ? 'งานบริการ, ขายสินค้า, ขายเศษวัสดุ, อื่นๆ' : 'ค่าวัสดุ/อุปกรณ์, ค่าน้ำ/ค่าไฟ, ค่าของกิน, ค่าเครื่องมือ, อื่นๆ'}.
+
+Return ONLY JSON:
 {
   "date": "YYYY-MM-DD",
-  "partyName": "True store/person name",
+  "partyName": "Exact Store/Person Name",
   "vatAmount": number,
   "items": [
-    { "itemName": "Actual Item Name from Image", "unitPrice": number, "quantity": number, "category": "Logical Category" }
+    { "itemName": "Literal Transcription of Item from Image", "unitPrice": number, "quantity": number, "category": "Logical Category" }
   ]
 }
-Output Thai for names and items. Use 0 or "" if missing.`;
+Use Thai for names/items.`;
 
   const userContent = [
     { type: "text", text: `Please analyze these ${base64Images.length} images for a ${modalType} entry. Reconcile bill details with slip names if both are present.` }
