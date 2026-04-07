@@ -460,22 +460,26 @@ export default function App() {
       category: it.category
     }));
 
-    // 1. Update local state immediately
+    // Local Update
     if (isEditMode) {
       setTransactions(prev => prev.map(t => t.id === editingTxId ? newTransactions[0] : t));
     } else {
       setTransactions(prev => [...newTransactions, ...prev]);
     }
 
-    setIsModalOpen(false);
     const imagesToUpload = [...selectedImages];
     const editingId = editingTxId;
     const isEditing = isEditMode;
+    
+    // Reset form states
+    setIsModalOpen(false);
     setSelectedImages([]);
-    setIsSubmitting(true);
+    setIsEditMode(false);
+    setEditingTxId(null);
 
-    // 2. Upload to Google Sheets
-    const saveToSheets = async () => {
+    const performSubmission = async () => {
+      setIsSubmitting(true);
+      setSyncStatus('syncing');
       try {
         if (isEditing) {
           await fetch(API_URL, {
@@ -491,7 +495,6 @@ export default function App() {
           });
         }
 
-        // 3. Handle Cloudinary Images if any
         if (imagesToUpload.length > 0) {
           const CLOUDINARY_CLOUD = 'djrwxouxx';
           const CLOUDINARY_PRESET = 'wtr_receipts';
@@ -512,12 +515,8 @@ export default function App() {
             const finalUrl = uploadedUrls.join(', ');
             const targetIds = isEditing ? [editingId] : newTransactions.map(t => t.id);
 
-            // Update local state with URLs
-            setTransactions(prev => prev.map(t =>
-              targetIds.includes(t.id) ? { ...t, receiptUrl: finalUrl } : t
-            ));
+            setTransactions(prev => prev.map(t => targetIds.includes(t.id) ? { ...t, receiptUrl: finalUrl } : t));
 
-            // Update Sheets with URLs
             await fetch(API_URL, {
               method: 'POST',
               body: JSON.stringify({
@@ -528,27 +527,27 @@ export default function App() {
             });
           }
         }
-        setIsSubmitting(false);
         setSyncStatus('success');
         setTimeout(() => setSyncStatus('idle'), 2000);
       } catch (err) {
         console.error("Submission failed:", err);
-        setIsSubmitting(false);
         setSyncStatus('error');
+      } finally {
+        setIsSubmitting(false);
       }
     };
 
-    // 4. Check for New Party before final save
-    const partyExists = parties.some(p => p.name.trim().toLowerCase() === formData.partyName.trim().toLowerCase());
-    if (!partyExists && formData.partyName.trim() !== '' && formData.partyName.trim() !== 'ทั่วไป') {
-      setTempNewPartyName(formData.partyName.trim());
+    // Check Party
+    const partyName = formData.partyName.trim();
+    const partyExists = parties.some(p => p.name.trim().toLowerCase() === partyName.toLowerCase());
+    
+    if (!partyExists && partyName !== '' && partyName !== 'ทั่วไป') {
+      setTempNewPartyName(partyName);
       setIsNewPartyPromptOpen(true);
-      window._pendingSubmit = saveToSheets;
+      window._pendingSubmit = performSubmission;
     } else {
-      saveToSheets();
+      performSubmission();
     }
-    setIsEditMode(false);
-    setEditingTxId(null);
   };
 
   const handleAIScan = async () => {
@@ -559,16 +558,17 @@ export default function App() {
 
     setIsScanning(true);
     try {
-      // ใช้รูปแรกที่ถูกเลือก
-      const base64Data = selectedImages[0].base64.split(',')[1];
+      // ส่งรูปทั้งหมดที่ถูกเลือกไปเป็นอาเรย์
+      const base64Images = selectedImages.map(img => img.base64.split(',')[1]);
 
       const response = await fetch(API_URL, {
         method: 'POST',
         body: JSON.stringify({
           action: 'analyzeReceiptWithAI',
           payload: {
-            base64Image: base64Data,
-            modalType: modalType
+            base64Images: base64Images,
+            modalType: modalType,
+            existingParties: parties // ส่งสมุดรายชื่อไปให้ AI ช่วยจับคู่
           }
         }),
         redirect: 'follow'
@@ -578,21 +578,36 @@ export default function App() {
 
       if (result.status === 'success' && result.data) {
         const ai = result.data;
+        const currentBiz = formData.business || activeBusinessId || 'garage';
 
-        // แมปข้อมูลหลัก
+        // แมปข้อมูลรายการสินค้า/บริการ
+        let newItems = ai.items && ai.items.length > 0
+          ? ai.items.map((it, idx) => ({
+            id: Date.now() + idx,
+            itemName: it.itemName || '',
+            unitPrice: it.unitPrice || 0,
+            quantity: it.quantity || 1,
+            category: it.category || (categories[currentBiz]?.[modalType]?.[0] || 'ทั่วไป')
+          }))
+          : [...formData.items];
+
+        // ถ้า AI เจอ VAT ให้เพิ่มเป็นรายการใหม่ทันที
+        if (ai.vatAmount && ai.vatAmount > 0) {
+          newItems.push({
+            id: Date.now() + 999,
+            itemName: 'ภาษีมูลค่าเพิ่ม 7% (VAT)',
+            unitPrice: ai.vatAmount,
+            quantity: 1,
+            category: (categories[currentBiz]?.[modalType]?.[0] || 'ทั่วไป')
+          });
+        }
+
         const updatedFormData = {
           ...formData,
           date: ai.date || formData.date,
           partyName: ai.partyName || formData.partyName,
-          items: ai.items && ai.items.length > 0
-            ? ai.items.map((it, idx) => ({
-              id: Date.now() + idx,
-              itemName: it.itemName || '',
-              unitPrice: it.unitPrice || 0,
-              quantity: it.quantity || 1,
-              category: it.category || (categories[formData.business]?.[modalType]?.[0] || 'ทั่วไป')
-            }))
-            : formData.items
+          items: newItems,
+          business: currentBiz
         };
 
         setFormData(updatedFormData);
