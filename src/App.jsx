@@ -62,7 +62,6 @@ export default function App() {
   const [deferredPrompt, setDeferredPrompt] = useState(null);
   const [showInstallBanner, setShowInstallBanner] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
-  // --- PWA Reload Prompt Logic ---
   const {
     offlineReady: [offlineReady, setOfflineReady],
     needRefresh: [needRefresh, setNeedRefresh],
@@ -70,11 +69,41 @@ export default function App() {
   } = useRegisterSW({
     onRegistered(r) {
       console.log('SW Registered: ', r);
+      // ตรวจสอบอัปเดตทุกๆ 1 ชั่วโมง
+      if (r) {
+        setInterval(() => {
+          r.update();
+        }, 60 * 60 * 1000);
+      }
     },
     onRegisterError(error) {
       console.log('SW Registration error: ', error);
     },
   });
+
+  // ฟังก์ชันล้างค่าและเริ่มระบบใหม่ (Hard Refresh)
+  const handleHardRefresh = () => {
+    if (window.confirm('คุณต้องการล้างแคชและเริ่มระบบใหม่รึเปล่าคะ? (ข้อมูลในมือถือจะไม่หายค่ะ)')) {
+      if (window.caches) {
+        caches.keys().then((names) => {
+          for (let name of names) caches.delete(name);
+        });
+      }
+      window.location.reload(true);
+    }
+  };
+
+  // ตรวจสอบอัปเดตอัตโนมัติเมื่อมีการสลับหน้าจอ (Tab Focus)
+  useEffect(() => {
+    const checkUpdate = () => {
+      if (!needRefresh) {
+        // ลองสั่งให้ SW เช็กอัปเดตเมื่อเปลี่ยนหน้าจอ
+        updateServiceWorker(false);
+      }
+    };
+    window.addEventListener('focus', checkUpdate);
+    return () => window.removeEventListener('focus', checkUpdate);
+  }, [needRefresh, updateServiceWorker]);
 
   const closeUpdatePrompt = () => {
     setOfflineReady(false);
@@ -411,6 +440,8 @@ export default function App() {
 
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
+    if (files.length === 0) return;
+    
     files.forEach(async (file) => {
       const preview = URL.createObjectURL(file);
       const compressed = await compressImage(file);
@@ -423,6 +454,9 @@ export default function App() {
         }]);
       }
     });
+    
+    // ล้างค่าเพื่อให้เลือกรูปเดิมซ้ำได้ (Fix for repeat selection on PC)
+    e.target.value = '';
   };
 
   const handleFormSubmit = async (e) => {
@@ -1104,24 +1138,34 @@ export default function App() {
                 </div>
 
                 <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-6">
-                  <div>
-                    <h4 className="font-black text-lg text-[#DDFD54] mb-1">เวอร์ชันปัจจุบัน: WTR Ledger v3.2</h4>
+                  <div className="flex-1">
+                    <h4 className="font-black text-lg text-[#DDFD54] mb-1">ระบบเวอร์ชันล่าสุด: WTR v3.5</h4>
                     <p className="text-xs font-black text-white/40 uppercase tracking-widest leading-relaxed">
-                      {needRefresh ? 'ตรวจพบเวอร์ชันใหม่ที่เสถียรกว่า!' : 'คุณกำลังใช้งานเวอร์ชันล่าสุดที่เสถียรที่สุดค่ะ'}
+                      {needRefresh ? 'ตรวจพบเวอร์ชันใหม่ที่เสถียรกว่า! กรุณากดอัปเดตค่ะ' : 'คุณกำลังใช้งานบนเครือข่ายที่เสถียรและเป็นเวอร์ชันล่าสุดค่ะ'}
                     </p>
                   </div>
 
-                  {needRefresh ? (
+                  <div className="flex flex-wrap gap-2 w-full md:w-auto">
+                    {needRefresh && (
+                      <button
+                        onClick={() => updateServiceWorker(true)}
+                        className="flex-1 md:flex-none bg-[#AE88F9] text-white px-6 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
+                        <Sparkles size={14} /> Update Now
+                      </button>
+                    )}
+                    
                     <button
                       onClick={() => updateServiceWorker(true)}
-                      className="w-full md:w-auto bg-[#DDFD54] text-[#1D1B20] px-8 py-4 rounded-[24px] font-black text-sm shadow-[0_10px_30px_rgba(221,253,84,0.3)] hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-3">
-                      <Sparkles size={18} /> อัปเดตเข้าระบบล่าสุด
+                      className="flex-1 md:flex-none bg-[#DDFD54] text-[#1D1B20] px-6 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
+                      <Search size={14} /> Check Update
                     </button>
-                  ) : (
-                    <div className="w-full md:w-auto bg-white/5 border border-white/10 px-8 py-4 rounded-[24px] font-black text-sm text-white/30 flex items-center justify-center gap-3 pointer-events-none">
-                      <Check size={18} className="text-emerald-500" /> ระบบล่าสุดแล้ว
-                    </div>
-                  )}
+
+                    <button
+                      onClick={handleHardRefresh}
+                      className="flex-1 md:flex-none bg-white/10 hover:bg-white/20 text-white/60 hover:text-white px-6 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-widest transition-all flex items-center justify-center gap-2 border border-white/5">
+                      <RefreshCcw size={14} /> Hard Refresh
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
