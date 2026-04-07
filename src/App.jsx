@@ -470,7 +470,7 @@ export default function App() {
     const imagesToUpload = [...selectedImages];
     const editingId = editingTxId;
     const isEditing = isEditMode;
-    
+
     // Reset form states
     setIsModalOpen(false);
     setSelectedImages([]);
@@ -540,7 +540,7 @@ export default function App() {
     // Check Party
     const partyName = formData.partyName.trim();
     const partyExists = parties.some(p => p.name.trim().toLowerCase() === partyName.toLowerCase());
-    
+
     if (!partyExists && partyName !== '' && partyName !== 'ทั่วไป') {
       setTempNewPartyName(partyName);
       setIsNewPartyPromptOpen(true);
