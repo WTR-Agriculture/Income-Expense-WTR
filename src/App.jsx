@@ -445,7 +445,7 @@ export default function App() {
   const handleImageSelect = (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
-    
+
     files.forEach(async (file) => {
       const preview = URL.createObjectURL(file);
       const compressed = await compressImage(file);
@@ -458,7 +458,7 @@ export default function App() {
         }]);
       }
     });
-    
+
     // ล้างค่าเพื่อให้เลือกรูปเดิมซ้ำได้ (Fix for repeat selection on PC)
     e.target.value = '';
   };
@@ -466,7 +466,12 @@ export default function App() {
   const handleFormSubmit = async (e) => {
     if (e) e.preventDefault();
     if (activeBusinessId === 'all' && !formData.business) {
-      alert('กรุณาเลือกธุรกิจก่อนบันทึกรายการค่ะ');
+      alert('กรุณาเลือกธุรกิจก่อนบันทึกนะคะ');
+      return;
+    }
+
+    if (formData.items.some(it => !it.category)) {
+      alert('กรุณาเลือกหมวดหมู่ให้ครบทุกรายการด้วยนะคะพี่สาว (บังคับเลือกค่ะ)');
       return;
     }
 
@@ -618,14 +623,14 @@ export default function App() {
         const ai = result.data;
         const currentBiz = formData.business || activeBusinessId || 'garage';
 
-        // แมปข้อมูลรายการสินค้า/บริการ
+        // แมปข้อมูลรายการสินค้า/บริการ (ไม่ให้ AI เลือกหมวดหมู่เอง)
         let newItems = ai.items && ai.items.length > 0
           ? ai.items.map((it, idx) => ({
             id: Date.now() + idx,
             itemName: it.itemName || '',
             unitPrice: it.unitPrice || 0,
             quantity: it.quantity || 1,
-            category: it.category || (categories[currentBiz]?.[modalType]?.[0] || 'ทั่วไป')
+            category: '' // บังคับให้ผู้ใช้เลือกเองตามคำขอ
           }))
           : [...formData.items];
 
@@ -636,7 +641,7 @@ export default function App() {
             itemName: 'ภาษีมูลค่าเพิ่ม 7% (VAT)',
             unitPrice: ai.vatAmount,
             quantity: 1,
-            category: (categories[currentBiz]?.[modalType]?.[0] || 'ทั่วไป')
+            category: '' // บังคับให้ผู้ใช้เลือกเองเช่นกัน
           });
         }
 
@@ -1157,7 +1162,7 @@ export default function App() {
                         <Sparkles size={14} /> Update Now
                       </button>
                     )}
-                    
+
                     <button
                       onClick={() => updateServiceWorker(true)}
                       className="flex-1 md:flex-none bg-[#DDFD54] text-[#1D1B20] px-6 py-4 rounded-[20px] font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 active:scale-95 transition-all flex items-center justify-center gap-2">
@@ -1497,16 +1502,23 @@ export default function App() {
                             className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm focus:ring-2 focus:ring-[#AE88F9]/20"
                           />
                         </div>
-                        <select
-                          value={item.category}
-                          onChange={e => {
-                            const newItems = [...formData.items];
-                            newItems[index].category = e.target.value;
-                            setFormData({ ...formData, items: newItems });
-                          }}
-                          className="w-full bg-white p-4 rounded-2xl outline-none font-black text-sm appearance-none border-none">
-                          {(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}
-                        </select>
+                        <div className="relative">
+                          <label className="text-[9px] font-black uppercase text-[#AE88F9] mb-1.5 block">
+                            เลือกประเภทหมวดหมู่ (บังคับเลือก)*
+                          </label>
+                          <select
+                            value={item.category}
+                            onChange={e => {
+                              const newItems = [...formData.items];
+                              newItems[index].category = e.target.value;
+                              setFormData({ ...formData, items: newItems });
+                            }}
+                            className={`w-full bg-white p-4 rounded-2xl outline-none font-black text-sm appearance-none border-2 transition-all ${!item.category ? 'border-amber-400 bg-amber-50' : 'border-transparent'}`}>
+                            <option value="" disabled>-- กรุณาเลือกหมวดหมู่ --</option>
+                            {(categories[formData.business]?.[modalType] || ['ทั่วไป']).map(c => <option key={c} value={c}>{c}</option>)}
+                          </select>
+                          {!item.category && <div className="absolute right-4 bottom-4 pointer-events-none text-amber-500 animate-bounce"><AlertCircle size={16} /></div>}
+                        </div>
                       </div>
 
                       <div className="flex items-center gap-3">

@@ -59,25 +59,25 @@ function analyzeReceiptWithAI(payload) {
   const partyListContext = existingParties ? existingParties.map(p => `${p.name} ${p.note ? '(' + p.note + ')' : ''}`).join(', ') : 'None';
 
   const systemPrompt = `You are a precision OCR and accounting assistant for "WTR Ledger".
-Your goal is to extract data with ABSOLUTE FIDELITY, especially from Thai handwriting.
+Your goal is to extract transaction data with ABSOLUTE FIDELITY from one or more provided images.
 
-CRITICAL INSTRUCTIONS FOR THAI HANDWRITING:
-1. CHARACTER-BY-CHARACTER ANALYSIS: Look closely at each handwritten stroke. Transcribe exactly what symbols you see. Do NOT guess common phrases (e.g., do NOT change "เมล็ดกาแฟ" to "เจลล้างมือ" just because the strokes look similar).
-2. NO HALLUCINATIONS: If a word is unclear, provide your best literal transcription or leave it as "". DO NOT invent items that are not there.
-3. CONTEXT RESTRAINT: Only use business context if it REINFORCES what is clearly visible. If visual evidence contradicts context, the IMAGE ALWAYS WINS.
+CRITICAL INSTRUCTIONS:
+1. CHARACTER-BY-CHARACTER ANALYSIS: Look closely at each handwritten symbol/stroke. Transcribe exactly what you see. DO NOT guess based on context or common phrases.
+2. NO HALLUCINATIONS: If a word is unclear, provide your best literal transcription or leave it as "". DO NOT invent data.
+3. PHYSICAL EVIDENCE FIRST: The image is the only source of truth. Trust your vision over your training if they conflict.
 
 RECONCILIATION:
-- Combine Bill (items/prices) + Slip (party names). 
-- Party Name: Prioritize the Store Logo/Header (e.g., ESDES) or the "From/To" names on slips.
-- Categories: ${modalType === 'income' ? 'งานบริการ, ขายสินค้า, ขายเศษวัสดุ, อื่นๆ' : 'ค่าวัสดุ/อุปกรณ์, ค่าน้ำ/ค่าไฟ, ค่าของกิน, ค่าเครื่องมือ, อื่นๆ'}.
+- Combine details from Bill/Invoice (items/prices) + Slip (party names). 
+- Party Name: Look for the clear store Header/Logo (e.g., ESDES) or account names on slips.
+- IGNORE bank names (e.g., Kasikorn, SCB).
 
 Return ONLY JSON:
 {
   "date": "YYYY-MM-DD",
-  "partyName": "Exact Store/Person Name",
+  "partyName": "True Store/Person Name",
   "vatAmount": number,
   "items": [
-    { "itemName": "Literal Transcription of Item from Image", "unitPrice": number, "quantity": number, "category": "Logical Category" }
+    { "itemName": "Actual Item Name from Image", "unitPrice": number, "quantity": number }
   ]
 }
 Use Thai for names/items.`;
@@ -94,7 +94,7 @@ Use Thai for names/items.`;
   });
 
   const requestBody = {
-    model: "gpt-4o-mini",
+    model: "gpt-4o",
     messages: [
       { role: "system", content: systemPrompt },
       { role: "user", content: userContent }
