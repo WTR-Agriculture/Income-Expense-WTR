@@ -424,7 +424,7 @@ export default function App() {
       const img = new Image();
       const url = URL.createObjectURL(file);
       img.onload = () => {
-        const MAX = 1200;
+        const MAX = 2000;
         let { width, height } = img;
         if (width > MAX || height > MAX) {
           if (width > height) { height = Math.round((height * MAX) / width); width = MAX; }
@@ -433,7 +433,7 @@ export default function App() {
         canvas.width = width;
         canvas.height = height;
         ctx.drawImage(img, 0, 0, width, height);
-        const compressed = canvas.toDataURL('image/jpeg', 0.72);
+        const compressed = canvas.toDataURL('image/jpeg', 0.85);
         URL.revokeObjectURL(url);
         resolve(compressed);
       };
