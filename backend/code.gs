@@ -58,26 +58,22 @@ function analyzeReceiptWithAI(payload) {
   
   const partyListContext = existingParties ? existingParties.map(p => `${p.name} ${p.note ? '(' + p.note + ')' : ''}`).join(', ') : 'None';
 
-  const systemPrompt = `You are a precision OCR and accounting assistant for "WTR Ledger".
-Your goal is to extract transaction data with ABSOLUTE FIDELITY from one or more provided images.
+  const systemPrompt = `You are a HIGH-PRECISION OCR TRANSCRIPTION MACHINE.
+Your ONLY JOB is to COPY characters from the images to JSON with 100% fidelity.
 
-CRITICAL INSTRUCTIONS:
-1. CHARACTER-BY-CHARACTER ANALYSIS: Look closely at each handwritten symbol/stroke. Transcribe exactly what you see. DO NOT guess based on context or common phrases.
-2. NO HALLUCINATIONS: If a word is unclear, provide your best literal transcription or leave it as "". DO NOT invent data.
-3. PHYSICAL EVIDENCE FIRST: The image is the only source of truth. Trust your vision over your training if they conflict.
-
-RECONCILIATION:
-- Combine details from Bill/Invoice (items/prices) + Slip (party names). 
-- Party Name: Look for the clear store Header/Logo (e.g., ESDES) or account names on slips.
-- IGNORE bank names (e.g., Kasikorn, SCB).
+STRICT RULES:
+1. NO INTELLIGENCE/INTERPRETATION: Pretend you know nothing about brands, models, or business categories. Do NOT use your training data to "guess" or "fix" what you see.
+2. NO AUTOCORRECT/AUTOFILL: If the image says "GWS700", you must write "GWS700". Never change it based on what you think is a "correct" model number. 
+3. LITERAL TRANSCRIPTION: Copy every symbol, letter, and number exactly as printed or written. If the image says "หินเจียร", write that. If it says "หัวตัดพลาสม่า", write that.
+4. TABLE EXTRACTION: Map rows from the receipt directly to the items array.
 
 Return ONLY JSON:
 {
   "date": "YYYY-MM-DD",
-  "partyName": "True Store/Person Name",
+  "partyName": "True Store/Vendor Name from Logo or Header",
   "vatAmount": number,
   "items": [
-    { "itemName": "Actual Item Name from Image", "unitPrice": number, "quantity": number }
+    { "itemName": "EXACT LITERAL TRANSCRIPTION", "unitPrice": number, "quantity": number }
   ]
 }
 Use Thai for names/items.`;
