@@ -634,14 +634,19 @@ export default function App() {
           }))
           : [...formData.items];
 
-        // ถ้า AI เจอ VAT ให้เพิ่มเป็นรายการใหม่ทันที
-        if (ai.vatAmount && ai.vatAmount > 0) {
+        // --- เพิ่มตรรกะ Smart VAT (เครดิต Gemini) ---
+        // 1. คำนวณผลรวมของรายการสินค้าที่ AI อ่านได้
+        const itemsSum = newItems.reduce((sum, it) => sum + (parseFloat(it.unitPrice) * (parseFloat(it.quantity) || 1)), 0);
+
+        // 2. ตรวจสอบว่ายอดรวมสินค้า < ยอดรวมสุทธิท้ายบิล (ai.grandTotal) หรือไม่
+        // ถ้าผลรวมน้อยกว่า แสดงว่าเป็นบิลแบบ Exclusive VAT ค่อยเพิ่มบรรทัดภาษีเข้าไป
+        if (ai.vatAmount && ai.vatAmount > 0 && itemsSum < (ai.grandTotal || itemsSum)) {
           newItems.push({
             id: Date.now() + 999,
             itemName: 'ภาษีมูลค่าเพิ่ม 7% (VAT)',
             unitPrice: ai.vatAmount,
             quantity: 1,
-            category: '' // บังคับให้ผู้ใช้เลือกเองเช่นกัน
+            category: ''
           });
         }
 

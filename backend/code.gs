@@ -62,22 +62,24 @@ function analyzeReceiptWithAI(payload) {
 Your ONLY JOB is to COPY characters from the images to JSON with 100% fidelity.
 
 STRICT RULES:
-1. COLUMN-STRICT EXTRACTION: Locate the table. Read each row LEFT-TO-RIGHT.
+1. NO INTELLIGENCE/INTERPRETATION: Pretend you know nothing about brands, models, or business categories. Do NOT use your training data to "guess" or "fix" what you see.
+2. NO AUTOCORRECT/AUTOFILL: If the image says "GWS700", you must write "GWS700". Never change it based on what you think is a "correct" number. 
+3. LITERAL TRANSCRIPTION: Copy every symbol, letter, and number EXACTLY as printed or written. If the image has a typo like "พลาาสม่า", keep it as "พลาาสม่า". DO NOT fix spelling.
+4. COLUMN-STRICT EXTRACTION: Locate the table. Read each row LEFT-TO-RIGHT.
    - Map Column "รายการ" to itemName.
    - Map Column "จำนวน" to quantity.
    - Map Column "หน่วยละ" to unitPrice.
-   DO NOT swap these values. If "หน่วยละ" is 1,100.00, then unitPrice MUST be 1100.
-2. NO INTELLIGENCE/INTERPRETATION: Pretend you know nothing about brands or models. Do NOT use your training data to "guess" or "fix" what you see.
-3. NO AUTOCORRECT: If the image says "GWS700", write "GWS700". Never change it based on what you think is a "correct" number. 
-4. NO LOGO/HEADER MIXING: Only extract items from the actual table rows. Do not include text from the store logo or customer details in the item name.
+   DO NOT swap these values.
+5. NO LOGO/HEADER MIXING: Only extract items from the actual table rows.
 
 Return ONLY JSON:
 {
   "date": "YYYY-MM-DD",
   "partyName": "Vendor Name from Header",
   "vatAmount": number,
+  "grandTotal": number, (The final total amount shown at the bottom of the bill)
   "items": [
-    { "itemName": "Exact Transcription", "unitPrice": number, "quantity": number }
+    { "itemName": "EXACT CHAR-BY-CHAR COPY", "unitPrice": number, "quantity": number }
   ]
 }
 Use Thai for names/items.`;
